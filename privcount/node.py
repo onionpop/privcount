@@ -16,6 +16,8 @@ from privcount.log import format_delay_time_until, format_elapsed_time_since
 from privcount.statistics_noise import DEFAULT_SIGMA_TOLERANCE
 from privcount.traffic_model import TrafficModel, check_traffic_model_config
 
+from onionpop.pipeline import MiddleEarthModel
+
 def get_remaining_rounds(completed_phases, continue_config, current_state):
         '''
         If the TS is configured to continue collecting a limited number of
@@ -332,6 +334,21 @@ class PrivCountClient(PrivCountNode):
             tmodel = TrafficModel(start_config['traffic_model'])
             # register the dependencies for the dynamic counter labels
             tmodel.register_counters()
+
+        # purpose, position, and web classifier models are optional
+        # check to make sure we can load them if necessary
+        if 'purpose_model' in start_config:
+            purpose_model = MiddleEarthModel.load(start_config['purpose_model'])
+            if purpose_model is None:
+                return None
+        if 'position_model' in start_config:
+            position_model = MiddleEarthModel.load(start_config['position_model'])
+            if position_model is None:
+                return None
+        if 'webpage_model' in start_config:
+            webpage_model = MiddleEarthModel.load(start_config['webpage_model'])
+            if webpage_model is None:
+                return None
 
         # if the counters don't pass the validity checks, fail
         if not check_counters_config(start_config['counters'],

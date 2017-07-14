@@ -541,6 +541,29 @@ PRIVCOUNT_COUNTER_EVENTS = {
 'HSDir3StoreAddNewRevisionHistogram' : { HSDIR_STORE_EVENT },
 'HSDir3StoreAddUpdatedRevisionHistogram' : { HSDIR_STORE_EVENT },
 
+# circuit classification counters
+'MidPredictPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidGotSignalPredictPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidNoSignalPredictPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidPredictRendPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidGotSignalPredictRendPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidNoSignalPredictRendPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidPredictNotRendPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidGotSignalPredictNotRendPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidNoSignalPredictNotRendPurposeCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidPredictRendPurposePredictCGMPositionCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidGotSignalPredictRendPurposePredictCGMPositionCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidPredictRendPurposePredictNotCGMPositionCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidNoSignalPredictRendPurposePredictNotCGMPositionCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+'MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': { CIRCUIT_EVENT, CELL_EVENT },
+
 # the sanity check counter doesn't depend on any events
 DEFAULT_DUMMY_COUNTER_NAME : set(),
 }

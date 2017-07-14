@@ -25,6 +25,10 @@ from privcount.protocol import PrivCountClientProtocol, TorControlClientProtocol
 from privcount.tagged_event import parse_tagged_event, is_string_valid, is_list_valid, is_int_valid, is_flag_valid, is_float_valid, is_ip_address_valid, get_string_value, get_list_value, get_int_value, get_flag_value, get_float_value, get_ip_address_value
 from privcount.traffic_model import TrafficModel, check_traffic_model_config
 
+# imports for classification code
+from onionpop.features import Node, Cell, Circuit, Features
+from onionpop.pipeline import MiddleEarthModel
+
 SINGLE_BIN = SecureCounters.SINGLE_BIN
 
 # using reactor: pylint: disable=E1101
@@ -245,6 +249,17 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         if 'traffic_model' in config:
             traffic_model_config = config['traffic_model']
 
+        # pass the classification models to the aggregator
+        position_model_path = None
+        if 'position_model' in config:
+            position_model_path = config['position_model']
+        purpose_model_path = None
+        if 'purpose_model' in config:
+            purpose_model_path = config['purpose_model']
+        webpage_model_path = None
+        if 'webpage_model' in config:
+            webpage_model_path = config['webpage_model']
+
         # The aggregator doesn't care about the DC threshold
         self.aggregator = Aggregator(dc_counters,
                                      traffic_model_config,
@@ -253,7 +268,10 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
                                      counter_modulus(),
                                      self.config['event_source'],
                                      self.config['rotate_period'],
-                                     self.config['use_setconf'])
+                                     self.config['use_setconf'],
+                                     position_model_path,
+                                     purpose_model_path,
+                                     webpage_model_path)
 
         defer_time = config['defer_time'] if 'defer_time' in config else 0.0
         logging.info("got start command from tally server, starting aggregator in {}".format(format_delay_time_wait(defer_time, 'at')))
@@ -405,7 +423,7 @@ class Aggregator(ReconnectingClientFactory):
 
     def __init__(self, counters, traffic_model_config, sk_uids,
                  noise_weight, modulus, tor_control_port, rotate_period,
-                 use_setconf):
+                 use_setconf, position_model_path, purpose_model_path, webpage_model_path):
         self.secure_counters = SecureCounters(counters, modulus,
                                               require_generate_noise=True)
         self.collection_counters = counters
@@ -417,6 +435,19 @@ class Aggregator(ReconnectingClientFactory):
         self.traffic_model = None
         if traffic_model_config is not None:
             self.traffic_model = TrafficModel(traffic_model_config)
+
+        # load the optional pre-trained classifier models
+        # we will use these during the circuit end event
+        self.position_model = None
+        if position_model_path is not None:
+            self.position_model = MiddleEarthModel.load(position_model_path)
+        self.purpose_model = None
+        if purpose_model_path is not None:
+            self.purpose_model = MiddleEarthModel.load(purpose_model_path)
+        self.webpage_model = None
+        if webpage_model_path is not None:
+            self.webpage_model = MiddleEarthModel.load(webpage_model_path)
+        self.classify_info = {}
 
         self.noise_weight_config = noise_weight
         self.noise_weight_value = None
@@ -1654,7 +1685,7 @@ class Aggregator(ReconnectingClientFactory):
 
         # Validate the mandatory cell-specific fields
 
-        
+
         if not is_flag_valid("IsSentFlag",
                              fields, event_desc,
                              is_mandatory=True):
@@ -1737,7 +1768,7 @@ class Aggregator(ReconnectingClientFactory):
           RelayCellPayloadByteCount, RelayCellStreamId, RelayCellCommandString,
           IsRecognizedFlag, WasRelayCryptSuccessfulFlag
         TODO: See doc/TorEvents.markdown for all field names and definitions.
-        
+
         Returns True if an event was successfully processed (or ignored).
         Never returns False: we prefer to warn about malformed events and
         continue processing.
@@ -1784,8 +1815,77 @@ class Aggregator(ReconnectingClientFactory):
                                                bin=SINGLE_BIN,
                                                inc=1)
 
+        # if we have loaded classification models, store cell for later
+        if self.purpose_model != None and self.position_model != None and \
+            self.webpage_model is not None:
+
+            # save the cell for classification at the point when the circuit ends
+            # but only for mid circuits, since those are the only ones we need
+            # to run classification code on
+            is_mid = get_flag_value("IsMidFlag",
+                                    fields, event_desc,
+                                    is_mandatory=False,
+                                    default=False)
+
+            if is_mid:
+                self._handle_cell_classify(fields, event_desc, is_sent)
+
         # we processed and handled the event
         return True
+
+    def _handle_cell_classify(self, fields, event_desc, is_sent):
+        # now get all of the fields that we want to store for the cell
+        # if any of them are not present, assume this is not a proper
+        # cell that we care about and return
+
+        # since this is a mid circuit, we should have prev chan and circ ids
+        chan_id, circ_id = self._get_valid_classify_ids(fields, event_desc)
+        if chan_id is None or circ_id is None:
+            return
+
+        timestamp = get_float_value("EventTimestamp",
+                                fields, event_desc,
+                                is_mandatory=False)
+        if timestamp is None:
+            return
+
+        is_outbound = get_flag_value("IsOutboundFlag",
+                                 fields, event_desc,
+                                 is_mandatory=False)
+        if is_outbound is None:
+            return
+
+        cell_command = get_string_value("CellCommandString",
+                                 fields, event_desc,
+                                 is_mandatory=False)
+        if cell_command is None:
+            return
+
+        relay_command = get_string_value("RelayCommandString",
+                                 fields, event_desc,
+                                 is_mandatory=False,
+                                 default="UNKNOWN")
+        # make extra sure we don't discard cells where we cant read the relay_command
+        # this should have already been done in `get_string_value` because we sent
+        # in a default string, but do it here again to be certain
+        if relay_command is None:
+            relay_command = "UNKNOWN"
+
+        # if we get here, we have all of the fields we need
+        cell = Cell(chan_id, circ_id, timestamp, cell_command, relay_command, is_sent, is_outbound)
+
+        # we want to store the list of cells for each circuit
+        # we will process them when the circuit ends
+        self.classify_info.setdefault(chan_id, {}).setdefault(circ_id, [])
+
+        # set hard upper bound on cell list size to avoid crazy memory usage
+        if len(self.classify_info[chan_id][circ_id]) < 200000: # 200k cells, roughly 100 MiB
+            self.classify_info[chan_id][circ_id].append(cell)
+
+        # TODO we should clear the list of cells after some timeout even if we
+        # didn't see the circuit end for some reason, in order to avoid
+        # consuming too much memory. This could be done with a twisted timer.
+        return
 
     @staticmethod
     def are_circuit_node_fields_valid(fields, event_desc,
@@ -2000,7 +2100,7 @@ class Aggregator(ReconnectingClientFactory):
           {Inbound,Outbound}Exit{Cell,Byte}Count,
           {Inbound,Outbound}DirByteCount
         TODO: See doc/TorEvents.markdown for all field names and definitions.
-        
+
         Calls _handle_legacy_exit_circuit_event to increment legacy counters
         that were based on the legacy PRIVCOUNT_CIRCUIT_ENDED event.
 
@@ -2011,6 +2111,9 @@ class Aggregator(ReconnectingClientFactory):
         event_desc = "in PRIVCOUNT_CIRCUIT_CLOSE event"
 
         if not Aggregator.are_circuit_close_fields_valid(fields, event_desc):
+            # the circuit close event is invalid, but check if we can clear some classify state
+            self._try_to_clear_classify_info(fields, event_desc)
+
             # handle the event by warning (in the validator) and ignoring it
             return True
 
@@ -2216,8 +2319,299 @@ class Aggregator(ReconnectingClientFactory):
                                           bin=SINGLE_BIN,
                                           inc=1)
 
+        # if we have loaded classification models, process the circuit and its cells
+        if self.purpose_model != None and self.position_model != None and \
+            self.webpage_model is not None:
+            # we only want to run classification on circuits that we
+            # did not originate and that we serve in the middle
+            if is_mid:
+                # these flags should never be true for mid circuits
+                assert not is_origin
+                assert not is_entry
+                assert not is_exit
+                assert not is_end
+                # run classifiers and increment counters
+                self._handle_circuit_classify(fields, event_desc)
+
+            # we are done with the circuit, make sure classify state is cleared
+            self._try_to_clear_classify_info(fields, event_desc)
+
         # we processed and handled the event
         return True
+
+    def _handle_circuit_classify(self, fields, event_desc):
+        # handle the classification under the loaded classifiers
+        # and increment the appropriate counters
+        # this must be run only when we are on is_mid circuits
+
+        # we need valid IDs to continue
+        chan_id, circ_id = self._get_valid_classify_ids(fields, event_desc)
+
+        if chan_id is None or circ_id is None:
+            # some error with the flags or values
+            return
+
+        # check if we have a cell list for the circuit
+        cell_list = None
+        if chan_id in self.classify_info and circ_id in self.classify_info[chan_id]:
+            # the cell list is still owned by the classify_info struct
+            # it will be cleared after we return
+            cell_list = self.classify_info[chan_id][circ_id]
+
+        # don't calssify or increment anything without a cell list
+        if cell_list == None:
+            return
+
+        # previous and next node info
+        prev_node = self._get_node_for_classify(fields, event_dec, prefix="Previous")
+        next_node = self._get_node_for_classify(fields, event_dec, prefix="Next")
+
+        # if either of the nodes are None, we don't have enough to classify correctly
+        if prev_node is None or next_node is None:
+            return
+
+        # at this point we have enough to classify
+        circuit == Circuit(chan_id, circ_id, prev_node, next_node, cell_list=cell_list)
+
+        # ground truth info if this is a known circuit
+        got_signal = get_flag_value("ReceivedCircuitSignal",
+            fields, event_desc, default=False)
+        signal_payload = get_string_value("MostRecentCircuitSignalPayload",
+            fields, event_desc, default="UNKNOWN")
+
+        # This is facebook if we got a signal and the onion is facebook.
+        # We are ignoring Facebook's CDN onions, and direct access to the underlying
+        # OnionBalance addresses.
+        payload_is_facebook_onion = True if "facebookcorewwwi" in signal_payload else False
+
+        # don't count our crawler circuits that are not used to fetch the facebook onion site
+        if (not got_signal) or (got_signal and payload_is_facebook_onion):
+            self._increment_counters_classify(circuit, got_signal)
+        return
+
+    def _get_node_for_classify(self, fields, event_desc, prefix):
+        # the node info fields have already been validated if they exist
+        # but they might not exist, so we should check for None
+        # this function should only be called on mid circuits because we
+        # assume that prev and next nodes are relays
+        ip = get_ip_address_value("{}NodeIPAddress".format(prefix),
+            fields, event_desc)
+        fp = get_string_value("{}NodeFingerprint".format(prefix),
+            fields, event_desc)
+        fl = get_list_value("{}NodeFlagList".format(prefix),
+            fields, event_desc)
+
+        # the classifiers only need the exit and guard flags, so we
+        # can continue as long as we have at least the flag list
+        if fl is None:
+            return None
+
+        # this is a mid circuit, so both prev and next nodes must be relays
+        is_relay = True
+        is_guard = True if is_relay and "Guard" in fl else False
+        is_exit = True if is_relay and "Exit" in fl else False
+
+        # return a node with an arbitrary nickname
+        return Node("NA", ip, fp, is_relay, is_exit, is_guard)
+
+    def _try_to_clear_classify_info(self, fields, event_desc):
+        # check to see if we need to clear any cells that have
+        # accumulated for an impending classification attempt
+        if self.classify_info is None or len(self.classify_info) == 0:
+            # we have no state to clear
+            return
+
+        # we need valid ID values if we want to clear any state
+        chan_id, circ_id = self._get_valid_classify_ids(fields, event_desc)
+
+        if chan_id is None or circ_id is None:
+            # some error with the flags or values
+            return
+
+        # finally we can actually delete the state
+        # clear all queued cells for this circuit
+        self._clear_classify_info(chan_id, circ_id)
+        return
+
+    def _get_valid_classify_ids(self, fields, event_desc):
+        # returns chan_id, circ_id if valid, or None, None if invalid
+
+        # classify state is stored by previous channel and circuit ids,
+        if not Aggregator.are_circuit_id_fields_valid(fields, event_desc,
+                                          prefix="Previous"):
+            # the id fields were corrupt so we can't use them
+            return None, None
+
+        # now we know the id fields are valid (not corrupt)
+        prev_chan_id = get_int_value("PreviousChannelId", fields, event_desc)
+        prev_circ_id = get_int_value("PreviousCircuitId", fields, event_desc)
+
+        # need both IDs to be valid
+        if prev_chan_id is None or prev_circ_id is None:
+            return None, None
+        else:
+            return prev_chan_id, prev_circ_id
+
+    def _clear_classify_info(self, chan_id, circ_id):
+        # chan_id and circ_id should not be None, but we double check anyway
+        if chan_id is not None and chan_id in self.classify_info:
+            if circ_id is not None and circ_id in self.classify_info[chan_id]:
+                self.classify_info[chan_id].pop(circ_id, None)
+            if len(self.classify_info[chan_id]) == 0:
+                self.classify_info.pop(chan_id, None)
+
+    def _increment_counters_classify(self, circuit, got_signal):
+        assert self.purpose_model is not None
+        assert self.position_model is not None
+        assert self.webpage_model is not None
+
+        # got_signal means the circuit was built by our own client and
+        # the destination was the facebook onion site
+
+        # we classify rend purpose as is_rend_purp
+        #             cgm position as is_cgm_pos
+        #             and facebook_site as is_fb_site
+        # (cgm is the client-guard-middle, i.e. the 2nd relay from the client)
+
+        # now actually run the classifiers and increment counters
+        # ignore the confidence values, the classifier already used them to classify
+        is_rend_purp, rend_purp_confidence = self.purpose_model.predict(circuit)
+
+        # count number of circuits we ran through our purpose classifier
+        self.secure_counters.increment(
+                        'MidPredictPurposeCircuitCount',
+                        bin=SINGLE_BIN,
+                        inc=1)
+
+        # and how many of those we did and did not get a signal on
+        if got_signal:
+            self.secure_counters.increment(
+                            'MidGotSignalPredictPurposeCircuitCount',
+                            bin=SINGLE_BIN,
+                            inc=1)
+        else:
+            self.secure_counters.increment(
+                            'MidNoSignalPredictPurposeCircuitCount',
+                            bin=SINGLE_BIN,
+                            inc=1)
+
+        # count how many circuits we predicted were rendezvous and not
+        # and for how many of the rendezvous predictions we did and did not have a signal
+        if is_rend_purp:
+            self.secure_counters.increment(
+                            'MidPredictRendPurposeCircuitCount',
+                            bin=SINGLE_BIN,
+                            inc=1)
+
+            if got_signal:
+                self.secure_counters.increment(
+                                'MidGotSignalPredictRendPurposeCircuitCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                self.secure_counters.increment(
+                                'MidNoSignalPredictRendPurposeCircuitCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
+            # count position classification, but only for rend circuits
+            # ignore the confidence, the classifier already used it to decide
+            is_cgm_pos, cgm_pos_confidence =  self.position_model.predict(circuit)
+
+            # number of position predictions is same as MidPredictRendPurposeCircuitCount
+
+            if is_cgm_pos:
+                self.secure_counters.increment(
+                                  'MidPredictRendPurposePredictCGMPositionCircuitCount',
+                                  bin=SINGLE_BIN,
+                                  inc=1)
+
+                if got_signal:
+                    self.secure_counters.increment(
+                                      'MidGotSignalPredictRendPurposePredictCGMPositionCircuitCount',
+                                      bin=SINGLE_BIN,
+                                      inc=1)
+                else:
+                    self.secure_counters.increment(
+                                      'MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount',
+                                      bin=SINGLE_BIN,
+                                      inc=1)
+
+                # count site classification, but only for rend purpose and cgm position
+                # ignore the confidence, the classifier already used it to decide
+                is_fb_site, fb_site_confidence = self.webpage_model.predict(circuit)
+
+                # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount
+
+                if is_fb_site:
+                    self.secure_counters.increment(
+                                'MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
+                    if got_signal:
+                        self.secure_counters.increment(
+                                    'MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
+                                    bin=SINGLE_BIN,
+                                    inc=1)
+                    else:
+                        self.secure_counters.increment(
+                                    'MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
+                                    bin=SINGLE_BIN,
+                                    inc=1)
+
+                else: # not is_fb_site
+                    self.secure_counters.increment(
+                                'MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
+                    if got_signal:
+                        self.secure_counters.increment(
+                                    'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
+                                    bin=SINGLE_BIN,
+                                    inc=1)
+                    else:
+                        self.secure_counters.increment(
+                                    'MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
+                                    bin=SINGLE_BIN,
+                                    inc=1)
+
+            else: # not is_cgm_pos
+                self.secure_counters.increment(
+                                  'MidPredictRendPurposePredictNotCGMPositionCircuitCount',
+                                  bin=SINGLE_BIN,
+                                  inc=1)
+
+                if got_signal:
+                    self.secure_counters.increment(
+                                      'MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount',
+                                      bin=SINGLE_BIN,
+                                      inc=1)
+                else:
+                    self.secure_counters.increment(
+                                      'MidNoSignalPredictRendPurposePredictNotCGMPositionCircuitCount',
+                                      bin=SINGLE_BIN,
+                                      inc=1)
+
+        else: # not is_rend_purpose
+            self.secure_counters.increment(
+                            'MidPredictNotRendPurposeCircuitCount',
+                            bin=SINGLE_BIN,
+                            inc=1)
+
+            if got_signal:
+                self.secure_counters.increment(
+                                'MidGotSignalPredictNotRendPurposeCircuitCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                self.secure_counters.increment(
+                                'MidNoSignalPredictNotRendPurposeCircuitCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
+        return
 
     @staticmethod
     def is_allowed_version_valid(field_name, fields, event_desc,
