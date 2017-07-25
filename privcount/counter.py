@@ -342,6 +342,8 @@ PRIVCOUNT_COUNTER_EVENTS = {
 'Rend2MultiHopServiceCircuitCount' : { CIRCUIT_EVENT },
 'Rend2SingleOnionServiceCircuitCount' : { CIRCUIT_EVENT },
 
+'Rend2SingleOnionServiceFacebookASNCircuitCount' : { CIRCUIT_EVENT },
+
 # We collect these combined counters so there is only one lot of noise added
 'ExitAndRend2ClientCircuitCount' : { CIRCUIT_EVENT },
 'ExitAndRend2ServiceCircuitCount' : { CIRCUIT_EVENT },

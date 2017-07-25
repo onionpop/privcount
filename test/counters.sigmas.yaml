@@ -449,6 +449,8 @@ counters:
         sigma: 0.0
     Rend2SingleOnionServiceCircuitCount:
         sigma: 0.0
+    Rend2SingleOnionServiceFacebookASNCircuitCount:
+        sigma: 0.0
     Rend2MultiHopServiceCircuitCount:
         sigma: 0.0
     OriginCircuitCount:

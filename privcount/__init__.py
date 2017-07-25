@@ -5,6 +5,7 @@ __all__ = [
    'counter',
    'crypto',
    'data_collector',
+   'facebook_asn',
    'inject',
    'log',
    'plot',

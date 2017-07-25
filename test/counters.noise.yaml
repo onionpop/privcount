@@ -644,6 +644,9 @@ counters:
     Rend2SingleOnionServiceCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
+    Rend2SingleOnionServiceFacebookASNCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
     Rend2MultiHopServiceCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
