@@ -1,21 +1,21 @@
 The following is the list of counters that we can count to learn the statistics listed in `doc/ClassificationStats.markdown`.
 
-`RendCircuitCount`: circuits observed in the rendezvous position, client or service side  
+`Rend2CircuitCount`: circuits observed in the rendezvous position, client or service side  
 `EntryCircuitCount`: circuits observed in the entry position (includes client, service, exit, and overheads)  
 `EndCircuitCount`: circuits observed in the end position (includes client, service, exit, and overheads)  
 
-`RendServiceCircuitCount`: circuits observed in the rendezvous position, service side  
-`RendClientCircuitCount`: circuits observed in the rendezvous position, client side (includes circuits where the service never connected)  
+`Rend2ServiceCircuitCount`: circuits observed in the rendezvous position, service side  
+`Rend2ClientCircuitCount`: circuits observed in the rendezvous position, client side (includes circuits where the service never connected)  
 `ExitCircuitCount`: circuits observed in the exit position (client exit data circuits)  
-`ExitAndRendClientCircuitCount`: sum of (ExitCircuitCount + RendClientCircuitCount) with a single lot of noise  
-`ExitAndRendServiceCircuitCount`: sum of (ExitCircuitCount + RendServiceCircuitCount) with a single lot of noise  
+`ExitAndRend2ClientCircuitCount`: sum of (ExitCircuitCount + RendClientCircuitCount) with a single lot of noise  
+`ExitAndRend2ServiceCircuitCount`: sum of (ExitCircuitCount + RendServiceCircuitCount) with a single lot of noise  
 
-`RendMultiHopClientCircuitCount`: circuits observed in the rendezvous position, client side, multi-hop circuit
+`Rend2MultiHopClientCircuitCount`: circuits observed in the rendezvous position, client side, multi-hop circuit
 (excludes Tor2web)  
 `MidCircuitCount`: circuits observed in a middle position (multiple counts on multi-middle circuits)  
 
-`RendSingleOnionServiceCircuitCount`: circuits observed in the rendezvous position, service side, single hop  
-`RendSingleOnionServiceFacebookASNCircuitCount`: circuits observed in the rendezvous position, service side, single hop, service IP address is in a Facebook ASN  
+`Rend2SingleOnionServiceCircuitCount`: circuits observed in the rendezvous position, service side, single hop  
+`Rend2SingleOnionServiceFacebookASNCircuitCount`: circuits observed in the rendezvous position, service side, single hop, service IP address is in a Facebook ASN  
 
 ---
 

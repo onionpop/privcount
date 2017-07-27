@@ -6,8 +6,8 @@ This contains interesting statistics that we can learn by collecting some of the
 tag: _[RELAY]_  
 
 ```
-RendCircuitCount / EntryCircuitCount
-RendCircuitCount / EndCircuitCount
+Rend2CircuitCount / EntryCircuitCount
+Rend2CircuitCount / EndCircuitCount
 ```
 
 Notes:
@@ -20,8 +20,8 @@ Notes:
 tag: _[CLIENT]_  
 
 ```
-RendClientCircuitCount / ExitAndRendClientCircuitCount
-RendServiceCircuitCount / ExitAndRendServiceCircuitCount
+Rend2ClientCircuitCount / ExitAndRend2ClientCircuitCount
+Rend2ServiceCircuitCount / ExitAndRend2ServiceCircuitCount
 ```
 
 Notes:
@@ -33,12 +33,12 @@ Notes:
 tag: _[MID]_  
 
 ```
-RendMultiHopClientCircuitCount / MidCircuitCount
+Rend2MultiHopClientCircuitCount / MidCircuitCount
 ```
 
 Notes:
   * Measured in different positions
-  * We use `RendMultiHopClientCircuitCount`, because `RendClientCircuitCount` includes Tor2web, but `MidCircuitCount` does not.
+  * We use `Rend2MultiHopClientCircuitCount`, because `Rend2ClientCircuitCount` includes Tor2web, but `MidCircuitCount` does not.
   * This is slightly inaccurate, because `MidCircuitCount` counts 4-hop circuits 2 times, 5-hop circuits 3 times,
 6-hop circuits 4 times, and 7-hop circuits 5 times.
 
@@ -73,7 +73,7 @@ multi-middle counts in `MidGuessedPositionCircuitCount` and `MidCircuitCount`.
 tag: _[SINGLE_ONION_FACEBOOK]_  
 
 ```
-RendSingleOnionServiceFacebookASNCircuitCount / RendSingleOnionServiceCircuitCount
+Rend2SingleOnionServiceFacebookASNCircuitCount / Rend2SingleOnionServiceCircuitCount
 ```
 
 Notes:  
@@ -83,7 +83,7 @@ Notes:
 tag: _[FACEBOOK]_  
 
 ```
-RendSingleOnionServiceFacebookASNCircuitCount / RendServiceCircuitCount
+Rend2SingleOnionServiceFacebookASNCircuitCount / Rend2ServiceCircuitCount
 ```
 
 **i. Fraction of mid circuits that we know are Facebook Rend client data circuits**  
@@ -108,4 +108,4 @@ MidGuessedFacebookFirstMidOnClientRendCircuitCount / MidGuessedSitePositionCircu
 Notes:  
   * These counters all count "client rendezvous circuit observed from the first client middle position".
 So it only makes sense to collect them in middle positions.
-  * _[PREDICTED_FACEBOOK]_ should be similar to _[KNOWN_FACEBOOK]_ and _[FACEBOOK]_, taking into account classifier accuracy and multi-middle counts in `MidGuessedSitePositionCircuitCount` (but not in `RendServiceCircuitCount`).
+  * _[PREDICTED_FACEBOOK]_ should be similar to _[KNOWN_FACEBOOK]_ and _[FACEBOOK]_, taking into account classifier accuracy and multi-middle counts in `MidGuessedSitePositionCircuitCount` (but not in `Rend2ServiceCircuitCount`).

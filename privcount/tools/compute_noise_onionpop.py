@@ -68,13 +68,13 @@ onionpop_parameters = {
     'EndCircuitCount': circuit_parameters,
 
     # hs-related circuit counters
-    'RendCircuitCount': circuit_rend_parameters,
-    'RendMultiHopClientCircuitCount': circuit_rend_parameters,
-    'RendClientCircuitCount': circuit_rend_c_parameters,
-    'RendServiceCircuitCount': circuit_rend_s_parameters,
-    'ExitAndRendClientCircuitCount': circuit_parameters,
-    'ExitAndRendServiceCircuitCount': circuit_parameters,
-    'RendSingleOnionServiceFacebookASNCircuitCount': circuit_fb_parameters,
+    'Rend2CircuitCount': circuit_rend_parameters,
+    'Rend2MultiHopClientCircuitCount': circuit_rend_parameters,
+    'Rend2ClientCircuitCount': circuit_rend_c_parameters,
+    'Rend2ServiceCircuitCount': circuit_rend_s_parameters,
+    'ExitAndRend2ClientCircuitCount': circuit_parameters,
+    'ExitAndRend2ServiceCircuitCount': circuit_parameters,
+    'Rend2SingleOnionServiceFacebookASNCircuitCount': circuit_fb_parameters,
 
     # classficiation counters
     # hidden service protocol popularity
@@ -155,7 +155,7 @@ if __name__ == '__main__':
                                    sigma_tol=sigma_tol,
                                    epsilon_tol=epsilon_tol,
                                    sigma_ratio_tol=sigma_ratio_tol,
-                                   sanity_check=psn.DEFAULT_DUMMY_COUNTER_NAME)
+                                   sanity_check=None)
 
     # add single bins, that way we can use the resulting output as both the noise
     # file and the bins file.

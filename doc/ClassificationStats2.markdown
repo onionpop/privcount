@@ -22,11 +22,11 @@ These predictions can be cross-checked by counting the following:
 
 ```
 # measured
-TODO:?: RendMultiHopClientCircuitCount / MidCircuitCount
-TODO:?: RendCircuitCount / EntryCircuitCount
-TODO:?: RendCircuitCount / EndCircuitCount
-TODO:?: RendClientCircuitCount / ExitAndRendClientCircuitCount
-TODO:?: RendServiceCircuitCount / ExitAndRendServiceCircuitCount
+TODO:?: Rend2MultiHopClientCircuitCount / MidCircuitCount
+TODO:?: Rend2CircuitCount / EntryCircuitCount
+TODO:?: Rend2CircuitCount / EndCircuitCount
+TODO:?: Rend2ClientCircuitCount / ExitAndRend2ClientCircuitCount
+TODO:?: Rend2ServiceCircuitCount / ExitAndRend2ServiceCircuitCount
 ```
 
 ## Liklihood of serving in CGM position
@@ -53,7 +53,7 @@ These predictions can be cross-checked by counting the following:
 # measured
 # for rendezvous circuits, our relay should appear in the CGM position on roughly as
 # many circuits as it appears in the rend position
-MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount == RendClientCircuitCount
+MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount == Rend2ClientCircuitCount
 ```
 
 ## Popularity of Facebook onion site front page
@@ -78,5 +78,5 @@ These predictions can be cross-checked by counting the following:
 
 ```
 # measured
-RendSingleOnionServiceFacebookASNCircuitCount / RendServiceCircuitCount
+Rend2SingleOnionServiceFacebookASNCircuitCount / Rend2ServiceCircuitCount
 ```
