@@ -704,6 +704,7 @@ TODO: Re-test and merge previous counter
 
 - Rend2ServiceCircuitCount
 - Rend2SingleOnionServiceCircuitCount
+- Rend2SingleOnionServiceFacebookASNCircuitCount
 - Rend2MultiHopServiceCircuitCount
 
 - Rend2ClientCircuitCount

@@ -24,6 +24,7 @@ from privcount.node import PrivCountClient, EXPECTED_EVENT_INTERVAL_MAX, EXPECTE
 from privcount.protocol import PrivCountClientProtocol, TorControlClientProtocol, get_privcount_version
 from privcount.tagged_event import parse_tagged_event, is_string_valid, is_list_valid, is_int_valid, is_flag_valid, is_float_valid, is_ip_address_valid, get_string_value, get_list_value, get_int_value, get_flag_value, get_float_value, get_ip_address_value
 from privcount.traffic_model import TrafficModel, check_traffic_model_config
+from privcount.facebook_asn import is_facebook_asn
 
 # imports for classification code
 from onionpop.features import Node, Cell, Circuit, Features
@@ -2198,6 +2199,11 @@ class Aggregator(ReconnectingClientFactory):
                                                is_mandatory=False,
                                                default=None)
 
+        prev_ip = get_ip_address_value("PreviousNodeIPAddress",
+                                       fields, event_desc,
+                                       is_mandatory=False,
+                                       default=None)
+
         # Increment counters for mandatory fields and optional fields that
         # have defaults
 
@@ -2310,6 +2316,12 @@ class Aggregator(ReconnectingClientFactory):
                     if is_single_hop:
                         self.secure_counters.increment(
                                           'Rend2SingleOnionServiceCircuitCount',
+                                          bin=SINGLE_BIN,
+                                          inc=1)
+
+                        if prev_ip is not None and is_facebook_asn(prev_ip):
+                            self.secure_counters.increment(
+                                          'Rend2SingleOnionServiceFacebookASNCircuitCount',
                                           bin=SINGLE_BIN,
                                           inc=1)
                     else:

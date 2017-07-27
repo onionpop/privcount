@@ -2044,9 +2044,13 @@ counters:
     ExitAndRend2ServiceCircuitCount:
         bins:
         - [-.inf, .inf]
+    Rend2SingleOnionServiceFacebookASNCircuitCount:
+        bins:
+        - [-.inf, .inf]
     Rend2SingleOnionServiceCircuitCount:
         bins:
         - [-.inf, .inf]
+
     Rend2MultiHopServiceCircuitCount:
         bins:
         - [-.inf, .inf]
