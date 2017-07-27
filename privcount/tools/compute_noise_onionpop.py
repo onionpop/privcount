@@ -21,35 +21,40 @@ num_relay_machines = 3 # number of 'compromises' we protect against
 ##### privacy sensitivity #####
 
 # protect 1 site per 10 minutes for 8 hours (plus other circuits)
+# assume 1 circuit can handle all requests
 sensitivity_circuits = 6*8+10
 
-# protect 1 site per 10 minutes for 1 hour; each results in 4 rend_c and 4 rend_s circuits
+# protect 1 site per 10 minutes for 1 hour
+# according to marc's crawler results, 75% of crawled sites use 4 or fewer circuits
+# each client-created circuit results in a rend_c and a rend_s circuits
 sensitivity_rend_c_circuits = 6*1*4
 # protect a rend_s for each rend_c circuit
 sensitivity_rend_s_circuits = sensitivity_rend_c_circuits
 sensitivity_rend_circuits = sensitivity_rend_c_circuits + sensitivity_rend_s_circuits
 
-# 2 facebook logins per day (assume each session results in a long-lived persistent connection)
-sensitivity_fb_circuits = 2
+# 2 facebook logins per day
+# 75% of facebook crawls use 8 or fewer circuits according to marc's crawler results
+# assume persistent connections
+sensitivity_fb_circuits = 2*8
 
 # we don't need to protect circuits that our crawler creates
-sensitivity_crawler_circuits = 1 # use 1 instead of 0 to avoid corner case error in noise script
+sensitivity_crawler_circuits = 0
 
 ##### estimated values #####
 
 # taken from p2p initial data collection 6/16/16-6/17/16
 num_circuits_per_day = 8131540.0/2
 
-# guessed based on metrics: hs is 1% of all traffic by bytes
+# estimate based on metrics: hs is 1% of all traffic by bytes
 num_rend_c_circuits_per_day = num_circuits_per_day * 0.01
 num_rend_s_circuits_per_day = num_rend_c_circuits_per_day
 num_rend_circuits_per_day = num_rend_c_circuits_per_day + num_rend_s_circuits_per_day
 
-# facebook is 25% of all client usage
+# estimate that facebook is 25% of all client usage
 num_fb_circuits_per_day = num_rend_c_circuits_per_day * 0.25
 
-# based on crawler schedule
-num_crawler_circuits_per_day = 24*60
+# set crawler values to 0 so noise script works correctly
+num_crawler_circuits_per_day = 0
 
 ##### parameters that will be re-used #####
 
@@ -61,6 +66,7 @@ circuit_fb_parameters = (sensitivity_fb_circuits * epoch_length_days, num_fb_cir
 circuit_crawler_parameters = (sensitivity_crawler_circuits * epoch_length_days, num_crawler_circuits_per_day * epoch_length_days)
 
 # these are all "single counter" type of statistics
+# for a list of all classification-related counters, see doc/ClassificationCounters.markdown
 onionpop_parameters = {
     # normal circuit counters
     'MidCircuitCount': circuit_parameters,
@@ -101,30 +107,6 @@ onionpop_parameters = {
     'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': circuit_crawler_parameters,
 }
 
-''' list of all classification-specific counters, for reference
-    'MidPredictPurposeCircuitCount': circuit_parameters,
-    'MidGotSignalPredictPurposeCircuitCount': circuit_parameters,
-    'MidNoSignalPredictPurposeCircuitCount': circuit_parameters,
-    'MidPredictRendPurposeCircuitCount': circuit_parameters,
-    'MidGotSignalPredictRendPurposeCircuitCount': circuit_parameters,
-    'MidNoSignalPredictRendPurposeCircuitCount': circuit_parameters,
-    'MidPredictNotRendPurposeCircuitCount': circuit_parameters,
-    'MidGotSignalPredictNotRendPurposeCircuitCount': circuit_parameters,
-    'MidNoSignalPredictNotRendPurposeCircuitCount': circuit_parameters,
-    'MidPredictRendPurposePredictCGMPositionCircuitCount': circuit_parameters,
-    'MidGotSignalPredictRendPurposePredictCGMPositionCircuitCount': circuit_parameters,
-    'MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount': circuit_parameters,
-    'MidPredictRendPurposePredictNotCGMPositionCircuitCount': circuit_parameters,
-    'MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount': circuit_parameters,
-    'MidNoSignalPredictRendPurposePredictNotCGMPositionCircuitCount': circuit_parameters,
-    'MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': circuit_parameters,
-    'MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': circuit_parameters,
-    'MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': circuit_parameters,
-    'MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': circuit_parameters,
-    'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': circuit_parameters,
-    'MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': circuit_parameters,
-'''
-
 if __name__ == '__main__':
     epsilon = 0.3
     delta = 1e-3
@@ -132,15 +114,6 @@ if __name__ == '__main__':
     sigma_tol = psn.DEFAULT_SIGMA_TOLERANCE
     epsilon_tol = psn.DEFAULT_EPSILON_TOLERANCE
     sigma_ratio_tol = psn.DEFAULT_SIGMA_RATIO_TOLERANCE
-
-    # get optimal noise allocation for initial statistics
-    (epsilons, sigmas, sigma_ratio) =  psn.get_opt_privacy_allocation(epsilon,
-        delta, onionpop_parameters, excess_noise_ratio, sigma_tol=sigma_tol,
-        epsilon_tol=epsilon_tol, sigma_ratio_tol=sigma_ratio_tol)
-
-    # print information about traffic model statistics noise
-    #print('\n* Classifier stats *\n')
-    #psn.print_privacy_allocation(onionpop_parameters, sigmas, epsilons, excess_noise_ratio)
 
     psn.compare_noise_allocation(epsilon, delta, onionpop_parameters,
                              excess_noise_ratio,

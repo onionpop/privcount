@@ -107,8 +107,8 @@ def get_approximate_privacy_allocation(epsilon, delta, stats_parameters,
     init_param = None
     coefficient_sum = 1
     for param, (s, v) in stats_parameters.iteritems():
-        # ignore dummy counters
-        if v == 0.0:
+        # ignore dummy counters or counters with no privacy requirement
+        if s == 0 or v == 0.0:
             continue
         if init_constant is None:
             init_constant = float(s) / v
@@ -119,7 +119,7 @@ def get_approximate_privacy_allocation(epsilon, delta, stats_parameters,
     for param, (s, v) in stats_parameters.iteritems():
         if (param != init_param):
             # give dummy counters a sensible default value
-            if v == 0.0:
+            if s == 0.0 or v == 0.0:
                 epsilons[param] = get_sanity_check_counter()['epsilon']
             else:
                 epsilons[param] = (epsilons[init_param] * float(s) / v /
@@ -129,7 +129,7 @@ def get_approximate_privacy_allocation(epsilon, delta, stats_parameters,
     stat_delta = float(delta) / len(stats_parameters)
     for param, (s, v) in stats_parameters.iteritems():
         # give dummy counters a sensible default value
-        if s == 0.0:
+        if s == 0.0 or v == 0.0:
             sigmas[param] = get_sanity_check_counter()['sigma']
         else:
             sigma = get_differentially_private_std(s, epsilons[param],
@@ -162,6 +162,9 @@ def get_epsilon_consumed(stats_parameters, excess_noise_ratio, sigma_ratio,
     stat_delta = float(delta) / len(stats_parameters)
     epsilons = dict()
     for param, (sensitivity, val) in stats_parameters.iteritems():
+        if sensitivity == 0.0 or val == 0.0:
+            epsilons[param] = 0.0
+            continue
         sigma = get_sigma(excess_noise_ratio, sigma_ratio, val)
         epsilon = get_differentially_private_epsilon(sensitivity, sigma, stat_delta, tol=tol)
         epsilons[param] = epsilon
@@ -209,6 +212,9 @@ def get_opt_privacy_allocation(epsilon, delta, stats_parameters,
     min_sigma_ratio = None
     max_sigma_ratio = None
     for param, (sensitivity, val) in stats_parameters.iteritems():
+        # ignore dummy counters or counters with no privacy requirement
+        if sensitivity == 0.0 or val == 0.0:
+            continue
         ratio = get_expected_noise_ratio(excess_noise_ratio,
                                          approx_sigmas[param],
                                          val)
@@ -227,6 +233,8 @@ def get_opt_privacy_allocation(epsilon, delta, stats_parameters,
     # turn opt sigma ratio into per-parameter sigmas
     opt_sigmas = dict()
     for param, (sensitivity, val) in stats_parameters.iteritems():
+        if sensitivity == 0.0 or val == 0.0:
+            opt_sigmas[param] = 0.0
         opt_sigma = get_sigma(excess_noise_ratio, opt_sigma_ratio, val)
         # Check if the sigma is too small
         if opt_sigma == 0.0:
