@@ -2404,7 +2404,7 @@ class Aggregator(ReconnectingClientFactory):
             return
 
         # at this point we have enough to classify
-        circuit == Circuit(chan_id, circ_id, prev_node, next_node, cell_list=cell_list)
+        circuit = Circuit(chan_id, circ_id, prev_node, next_node, cell_list=cell_list)
 
         # ground truth info if this is a known circuit
         got_signal = get_flag_value("ReceivedCircuitSignal",
