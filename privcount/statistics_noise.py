@@ -5,11 +5,7 @@ import math
 import scipy.stats
 import yaml
 
-DEFAULT_SIGMA_TOLERANCE = 1e-6
-DEFAULT_EPSILON_TOLERANCE = 1e-15
-DEFAULT_SIGMA_RATIO_TOLERANCE = 1e-6
-
-DEFAULT_DUMMY_COUNTER_NAME = 'ZeroCount'
+from privcount.counter import DEFAULT_SIGMA_TOLERANCE, DEFAULT_EPSILON_TOLERANCE, DEFAULT_SIGMA_RATIO_TOLERANCE, DEFAULT_DUMMY_COUNTER_NAME, is_circuit_sample_counter
 
 def satisfies_dp(sensitivity, epsilon, delta, std):
     '''
@@ -271,7 +267,8 @@ def get_sanity_check_counter():
     return sanity_check
 
 def get_noise_allocation(noise_parameters,
-                         sanity_check=DEFAULT_DUMMY_COUNTER_NAME):
+                         sanity_check=DEFAULT_DUMMY_COUNTER_NAME,
+                         circuit_sample_rate=1.0):
     '''
     An adapter which wraps get_opt_privacy_allocation, extracting the
     parameters from the noise_parameters data structure, and updating
@@ -279,6 +276,8 @@ def get_noise_allocation(noise_parameters,
     If sanity_check is not None, adds a sanity check counter to the result,
     with the counter name supplied in sanity_check, and values created using
     get_sanity_check_counter().
+    Scales expected circuit counter values by circuit_sample_rate before
+    allocating noise.
     Returns a data structure containing the results on success.
     Raises a ValueError on failure.
     The format of noise_parameters is:
@@ -302,6 +301,8 @@ def get_noise_allocation(noise_parameters,
     The expected noise ratio should be identical for each counter, except for
     floating-point inaccuracies.
     '''
+    assert circuit_sample_rate >= 0.0
+    assert circuit_sample_rate <= 1.0
     # extract the top-level structures
     noise = noise_parameters['privacy']
     counters = noise_parameters['counters']
@@ -309,8 +310,11 @@ def get_noise_allocation(noise_parameters,
     # rearrange the counter values, and produce the parameter-only structure
     stats_parameters = {}
     for stat in counters:
+        estimated_value = counters[stat]['estimated_value']
+        if is_circuit_sample_counter(stat):
+            estimated_value *= circuit_sample_rate
         statistics = (counters[stat]['sensitivity'],
-                      counters[stat]['estimated_value'])
+                      estimated_value)
         stats_parameters[stat] = statistics
     # calculate the noise allocations
     # and update the structure with defaults, if not already present
@@ -348,7 +352,8 @@ def get_noise_allocation_stats(epsilon, delta, stats_parameters,
                                sigma_tol=None,
                                epsilon_tol=None,
                                sigma_ratio_tol=None,
-                               sanity_check=DEFAULT_DUMMY_COUNTER_NAME):
+                               sanity_check=DEFAULT_DUMMY_COUNTER_NAME,
+                               circuit_sample_rate=1.0):
     '''
     Like get_noise_allocation, but uses the structure stats_parameters:
     - 'CounterName': multiple
@@ -394,7 +399,8 @@ def get_noise_allocation_stats(epsilon, delta, stats_parameters,
         counter['sensitivity'] = sensitivity
         counter['estimated_value'] = estimated_value
         noise_parameters['counters'][stat] = counter
-    return get_noise_allocation(noise_parameters, sanity_check=sanity_check)
+    return get_noise_allocation(noise_parameters, sanity_check=sanity_check,
+                                circuit_sample_rate=circuit_sample_rate)
 
 def compare_noise_allocation(epsilon, delta, stats_parameters,
                              excess_noise_ratio,

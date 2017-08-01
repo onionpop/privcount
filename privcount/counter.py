@@ -13,9 +13,13 @@ from random import SystemRandom
 from copy import deepcopy
 from math import sqrt, isnan
 
-from privcount.statistics_noise import DEFAULT_SIGMA_TOLERANCE, DEFAULT_DUMMY_COUNTER_NAME
 from privcount.log import format_period, format_elapsed_time_since, format_delay_time_until
 
+DEFAULT_SIGMA_TOLERANCE = 1e-6
+DEFAULT_EPSILON_TOLERANCE = 1e-15
+DEFAULT_SIGMA_RATIO_TOLERANCE = 1e-6
+
+DEFAULT_DUMMY_COUNTER_NAME = 'ZeroCount'
 # The label used for the default noise weight for testing
 # Labels are typically data collector relay fingerprints
 DEFAULT_NOISE_WEIGHT_NAME = '*'
@@ -630,6 +634,33 @@ def get_events_for_known_counters():
     about.
     '''
     return get_events_for_counters(PRIVCOUNT_COUNTER_EVENTS.keys())
+
+def get_circuit_sample_events():
+    '''
+    Return the set of events affected by circuit_sample_rate.
+    '''
+    event_set = { CELL_EVENT,
+                  BYTES_EVENT,
+                  STREAM_EVENT,
+                  CIRCUIT_EVENT,
+                  # Not affected
+                  #CONNECTION_EVENT,
+                  #HSDIR_STORE_EVENT,
+                  # Unused events
+                  DNS_EVENT,
+                  LEGACY_CIRCUIT_EVENT,
+                  }
+    return event_set
+
+def is_circuit_sample_counter(counter):
+    '''
+    If counter uses an event affected by circuit_sample_rate, return True.
+    Otherwise, return False.
+    '''
+    counter_events = get_events_for_counter(counter)
+    circuit_sample_events = get_circuit_sample_events()
+    common_events = counter_events.intersection(circuit_sample_events)
+    return len(common_events) > 0
 
 def are_events_expected(counter_list, relay_flag_list):
     '''

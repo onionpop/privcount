@@ -187,6 +187,12 @@ class TallyServer(ServerFactory, PrivCountServer):
                 ts_conf['secret_handshake'],
                 create=True)
 
+            ts_conf.setdefault('circuit_sample_rate', 1.0)
+            ts_conf['circuit_sample_rate'] = \
+                float(ts_conf['circuit_sample_rate'])
+            assert ts_conf['circuit_sample_rate'] >= 0.0
+            assert ts_conf['circuit_sample_rate'] <= 1.0
+
             # the counter bin file
             if 'counters' in ts_conf:
                 ts_conf['counters'] = normalise_path(ts_conf['counters'])
@@ -290,7 +296,9 @@ class TallyServer(ServerFactory, PrivCountServer):
             # now all the files are loaded, use noise to calculate sigmas
             # (if noise was configured)
             if 'privacy' in ts_conf['noise']:
-                ts_conf['noise'] = get_noise_allocation(ts_conf['noise'])
+                ts_conf['noise'] = get_noise_allocation(
+                    ts_conf['noise'],
+                    circuit_sample_rate=ts_conf['circuit_sample_rate'])
                 # and write it to the specified file (if configured)
                 if 'allocation' in ts_conf:
                     with open(ts_conf['allocation'], 'w') as fout:
@@ -387,10 +395,6 @@ class TallyServer(ServerFactory, PrivCountServer):
             assert max_tally_counter_value() > 0
             assert max_tally_counter_value() < counter_modulus()
             assert -min_tally_counter_value() < counter_modulus()
-
-            for key in ts_conf['counters']:
-                if 'Histogram' in key:
-                    assert 'bins' in ts_conf['counters'][key] and ts_conf['counters'][key]['bins'] is not None
 
             if self.config == None:
                 self.config = ts_conf
@@ -920,6 +924,7 @@ class TallyServer(ServerFactory, PrivCountServer):
                                                 dc_uids,
                                                 counter_modulus(),
                                                 clock_padding,
+                                                self.config['circuit_sample_rate'],
                                                 self.config)
         self.collection_phase.start()
 
@@ -1013,7 +1018,7 @@ class CollectionPhase(object):
 
     def __init__(self, period, counters_config, traffic_model_config, noise_config,
                  noise_weight_config, dc_threshold_config, sk_uids,
-                 sk_public_keys, dc_uids, modulus, clock_padding,
+                 sk_public_keys, dc_uids, modulus, clock_padding, circuit_sample_rate,
                  tally_server_config):
         # store configs
         self.period = period
@@ -1028,6 +1033,7 @@ class CollectionPhase(object):
         self.dc_uids = dc_uids
         self.modulus = modulus
         self.clock_padding = clock_padding
+        self.circuit_sample_rate = circuit_sample_rate
         # make a deep copy, so we can delete unnecesary keys
         self.tally_server_config = deepcopy(tally_server_config)
         self.tally_server_status = None
@@ -1224,6 +1230,7 @@ class CollectionPhase(object):
             config['dc_threshold'] = self.dc_threshold_config
             config['defer_time'] = self.clock_padding
             config['collect_period'] = self.period
+            config['circuit_sample_rate'] = self.circuit_sample_rate
             logging.info("sending start comand with {} counters ({} bins) and requesting {} shares to data collector {}"
                          .format(len(config['counters']),
                                  count_bins(config['counters']),
