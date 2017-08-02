@@ -252,14 +252,14 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
 
         # pass the classification models to the aggregator
         position_model_path = None
-        if 'position_model' in config:
-            position_model_path = config['position_model']
+        if 'position_model' in self.config:
+            position_model_path = self.config['position_model']
         purpose_model_path = None
-        if 'purpose_model' in config:
-            purpose_model_path = config['purpose_model']
+        if 'purpose_model' in self.config:
+            purpose_model_path = self.config['purpose_model']
         webpage_model_path = None
-        if 'webpage_model' in config:
-            webpage_model_path = config['webpage_model']
+        if 'webpage_model' in self.config:
+            webpage_model_path = self.config['webpage_model']
 
         # The aggregator doesn't care about the DC threshold
         self.aggregator = Aggregator(dc_counters,

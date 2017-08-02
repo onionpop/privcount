@@ -335,21 +335,6 @@ class PrivCountClient(PrivCountNode):
             # register the dependencies for the dynamic counter labels
             tmodel.register_counters()
 
-        # purpose, position, and web classifier models are optional
-        # check to make sure we can load them if necessary
-        if 'purpose_model' in start_config:
-            purpose_model = MiddleEarthModel.load(start_config['purpose_model'])
-            if purpose_model is None:
-                return None
-        if 'position_model' in start_config:
-            position_model = MiddleEarthModel.load(start_config['position_model'])
-            if position_model is None:
-                return None
-        if 'webpage_model' in start_config:
-            webpage_model = MiddleEarthModel.load(start_config['webpage_model'])
-            if webpage_model is None:
-                return None
-
         # if the counters don't pass the validity checks, fail
         if not check_counters_config(start_config['counters'],
                               start_config['noise']['counters'],
