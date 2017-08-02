@@ -2075,3 +2075,66 @@ counters:
     Rend2MultiHopClientCircuitCount:
         bins:
         - [-.inf, .inf]
+    MidPredictRendPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidNoSignalPredictRendPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidGotSignalPredictRendPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidPredictNotRendPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidNoSignalPredictNotRendPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidGotSignalPredictNotRendPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidPredictPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidNoSignalPredictPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidGotSignalPredictPurposeCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidPredictRendPurposePredictCGMPositionCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidGotSignalPredictRendPurposePredictCGMPositionCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidPredictRendPurposePredictNotCGMPositionCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidNoSignalPredictRendPurposePredictNotCGMPositionCircuitCount:
+        bins:
+        - [-.inf, .inf]
+    MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount:
+        bins:
+        - [-.inf, .inf]

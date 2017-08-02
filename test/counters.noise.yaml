@@ -671,3 +671,66 @@ counters:
     Rend2MultiHopClientCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
+    MidPredictRendPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidNoSignalPredictRendPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidGotSignalPredictRendPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidPredictNotRendPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidNoSignalPredictNotRendPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidGotSignalPredictNotRendPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidPredictPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidNoSignalPredictPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidGotSignalPredictPurposeCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidPredictRendPurposePredictCGMPositionCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidGotSignalPredictRendPurposePredictCGMPositionCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidPredictRendPurposePredictNotCGMPositionCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidNoSignalPredictRendPurposePredictNotCGMPositionCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
+    MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount:
+        estimated_value: 0.0
+        sensitivity: 0.0
