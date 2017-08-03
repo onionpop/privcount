@@ -460,6 +460,7 @@ class Aggregator(ReconnectingClientFactory):
                 "params": {"n_estimators": 30}
             }
             self.purpose_model = Model(config)
+            self.purpose_model.train()
 
         self.webpage_model = None
         if webpage_model_path is not None and os.path.exists(os.path.expanduser(webpage_model_path)):
@@ -469,6 +470,8 @@ class Aggregator(ReconnectingClientFactory):
                 "params": {"nu": 0.2, "kernel": "rbf", "gamma": 10}
             }
             self.webpage_model = Model(config)
+            self.webpage_model.train()
+
         self.classify_info = {}
 
         self.noise_weight_config = noise_weight
