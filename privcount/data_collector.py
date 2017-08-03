@@ -253,13 +253,25 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         # pass the classification models to the aggregator
         position_model_path = None
         if 'position_model' in self.config:
-            position_model_path = self.config['position_model']
+            p = os.path.expanduser(self.config['position_model'])
+            if os.path.exists(p):
+                position_model_path = p
+            else:
+                logging.warning('position model path given but path {} does not exist'.format(p))
         purpose_model_path = None
         if 'purpose_model' in self.config:
-            purpose_model_path = self.config['purpose_model']
+            p = os.path.expanduser(self.config['purpose_model'])
+            if os.path.exists(p):
+                purpose_model_path = p
+            else:
+                logging.warning('purpose model path given but path {} does not exist'.format(p))
         webpage_model_path = None
         if 'webpage_model' in self.config:
-            webpage_model_path = self.config['webpage_model']
+            p = os.path.expanduser(self.config['webpage_model'])
+            if os.path.exists(p):
+                webpage_model_path = p
+            else:
+                logging.warning('webpage model path given but path {} does not exist'.format(p))
 
         # The aggregator doesn't care about the DC threshold
         self.aggregator = Aggregator(dc_counters,
@@ -443,7 +455,7 @@ class Aggregator(ReconnectingClientFactory):
         # load the optional pre-trained classifier models
         # we will use these during the circuit end event
         self.position_model = None
-        if position_model_path is not None and os.path.exists(os.path.expanduser(position_model_path)):
+        if position_model_path is not None:
             config = {
                 "dataset": position_model_path,
                 "classifier": "PositionClassifier",
@@ -453,7 +465,7 @@ class Aggregator(ReconnectingClientFactory):
             self.position_model.train()
 
         self.purpose_model = None
-        if purpose_model_path is not None and os.path.exists(os.path.expanduser(purpose_model_path)):
+        if purpose_model_path is not None:
             config = {
                 "dataset": purpose_model_path,
                 "classifier": "PurposeClassifier",
@@ -463,7 +475,7 @@ class Aggregator(ReconnectingClientFactory):
             self.purpose_model.train()
 
         self.webpage_model = None
-        if webpage_model_path is not None and os.path.exists(os.path.expanduser(webpage_model_path)):
+        if webpage_model_path is not None:
             config = {
                 "dataset": webpage_model_path,
                 "classifier": "OneClassCUMUL",
