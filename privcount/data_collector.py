@@ -28,7 +28,7 @@ from privcount.facebook_asn import is_facebook_asn
 
 # imports for classification code
 from onionpop.features import Node, Cell, Circuit, Features
-from onionpop.pipeline import MiddleEarthModel
+from onionpop.pipeline import Model
 
 SINGLE_BIN = SecureCounters.SINGLE_BIN
 
@@ -443,14 +443,32 @@ class Aggregator(ReconnectingClientFactory):
         # load the optional pre-trained classifier models
         # we will use these during the circuit end event
         self.position_model = None
-        if position_model_path is not None:
-            self.position_model = MiddleEarthModel.load(position_model_path)
+        if position_model_path is not None and os.path.exists(os.path.expanduser(position_model_path)):
+            config = {
+                "dataset": position_model_path,
+                "classifier": "PurposeClassifier",
+                "params": {"n_estimators": 30}
+            }
+            self.position_model = Model(config)
+            self.position_model.train()
+
         self.purpose_model = None
-        if purpose_model_path is not None:
-            self.purpose_model = MiddleEarthModel.load(purpose_model_path)
+        if purpose_model_path is not None and os.path.exists(os.path.expanduser(purpose_model_path)):
+            config = {
+                "dataset": purpose_model_path,
+                "classifier": "PositionClassifier",
+                "params": {"n_estimators": 30}
+            }
+            self.purpose_model = Model(config)
+
         self.webpage_model = None
-        if webpage_model_path is not None:
-            self.webpage_model = MiddleEarthModel.load(webpage_model_path)
+        if webpage_model_path is not None and os.path.exists(os.path.expanduser(webpage_model_path)):
+            config = {
+                "dataset": webpage_model_path,
+                "classifier": "OneClassCUMUL",
+                "params": {"nu": 0.2, "kernel": "rbf", "gamma": 10}
+            }
+            self.webpage_model = Model(config)
         self.classify_info = {}
 
         self.noise_weight_config = noise_weight
@@ -2508,7 +2526,7 @@ class Aggregator(ReconnectingClientFactory):
 
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
-        is_rend_purp, rend_purp_confidence = self.purpose_model.predict(circuit)
+        is_rend_purp, _ = self.purpose_model.predict(circuit)
 
         # count number of circuits we ran through our purpose classifier
         self.secure_counters.increment(
@@ -2549,7 +2567,7 @@ class Aggregator(ReconnectingClientFactory):
 
             # count position classification, but only for rend circuits
             # ignore the confidence, the classifier already used it to decide
-            is_cgm_pos, cgm_pos_confidence =  self.position_model.predict(circuit)
+            is_cgm_pos, _ =  self.position_model.predict(circuit)
 
             # number of position predictions is same as MidPredictRendPurposeCircuitCount
 
@@ -2572,7 +2590,7 @@ class Aggregator(ReconnectingClientFactory):
 
                 # count site classification, but only for rend purpose and cgm position
                 # ignore the confidence, the classifier already used it to decide
-                is_fb_site, fb_site_confidence = self.webpage_model.predict(circuit)
+                is_fb_site, _ = self.webpage_model.predict(circuit)
 
                 # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount
 
