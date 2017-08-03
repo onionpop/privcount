@@ -2447,6 +2447,8 @@ class Aggregator(ReconnectingClientFactory):
             logging.warning("Not mid info")
             return
 
+        logging.warning("About to classify")
+
         # at this point we have enough to classify
         circuit = Circuit(chan_id, circ_id, prev_node, next_node, cell_list=cell_list)
 
@@ -2489,6 +2491,7 @@ class Aggregator(ReconnectingClientFactory):
         # the classifiers only need the exit and guard flags, so we
         # can continue as long as we have at least the flag list
         if fl is None:
+            logging.warning("No {} relay flag list".format(prefix))
             return None
 
         # this is a mid circuit, so both prev and next nodes must be relays
