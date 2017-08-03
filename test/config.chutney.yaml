@@ -28,7 +28,7 @@ tally_server:
     # We only run one round, so this is unused
     delay_period: 86400
     # Ignore some circuits, so we test this feature
-    circuit_sample_rate: 0.5
+    circuit_sample_rate: 0.9
     key: 'keys/ts.pem'
     cert: 'keys/ts.cert'
     # if the key file does not exist, the TS creates a file with a random key
@@ -66,3 +66,7 @@ data_collector:
     delay_period: 86400
     rotate_period: 5
     secret_handshake: 'keys/secret_handshake.yaml'
+    # Model paths
+    position_model: '../../model/position.model.pickle'
+    purpose_model: '../../model/purpose.model.pickle'
+    webpage_model: '../../model/webpage.model.pickle'

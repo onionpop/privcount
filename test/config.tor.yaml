@@ -61,3 +61,7 @@ data_collector:
     delay_period: 86400
     rotate_period: 5
     secret_handshake: 'keys/secret_handshake.yaml'
+    # Model paths
+    position_model: '../../model/position.model.pickle'
+    purpose_model: '../../model/purpose.model.pickle'
+    webpage_model: '../../model/webpage.model.pickle'

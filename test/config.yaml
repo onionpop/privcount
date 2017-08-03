@@ -110,3 +110,7 @@ data_collector:
     #sigma_decrease_tolerance: 1.0e-6 # (default: 1.0e-6) the sigma value decrease that the node will tolerate before enforcing a delay
     # all nodes must agree on this key to handshake correctly
     secret_handshake: 'keys/secret_handshake.yaml'
+    # Model paths
+    position_model: '../../model/position.model.pickle'
+    purpose_model: '../../model/purpose.model.pickle'
+    webpage_model: '../../model/webpage.model.pickle'
