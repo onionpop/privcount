@@ -446,7 +446,7 @@ class Aggregator(ReconnectingClientFactory):
         if position_model_path is not None and os.path.exists(os.path.expanduser(position_model_path)):
             config = {
                 "dataset": position_model_path,
-                "classifier": "PurposeClassifier",
+                "classifier": "PositionClassifier",
                 "params": {"n_estimators": 30}
             }
             self.position_model = Model(config)
@@ -456,7 +456,7 @@ class Aggregator(ReconnectingClientFactory):
         if purpose_model_path is not None and os.path.exists(os.path.expanduser(purpose_model_path)):
             config = {
                 "dataset": purpose_model_path,
-                "classifier": "PositionClassifier",
+                "classifier": "PurposeClassifier",
                 "params": {"n_estimators": 30}
             }
             self.purpose_model = Model(config)
