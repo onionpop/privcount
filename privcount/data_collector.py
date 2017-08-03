@@ -8,7 +8,7 @@ import sys
 import cPickle as pickle
 import yaml
 
-from time import time
+from time import time, clock
 from copy import deepcopy
 from base64 import b64decode
 
@@ -930,7 +930,13 @@ class Aggregator(ReconnectingClientFactory):
             context['noise_weight_value'] = self.noise_weight_value
         return context
 
+    MAX_EVENT_HANDLING_TIME = 1.0
+
     def handle_event(self, event):
+
+        # time how long it takes to handle an event
+        start_time = clock()
+
         if not self.secure_counters:
             return False
 
@@ -947,57 +953,67 @@ class Aggregator(ReconnectingClientFactory):
 
         # This event has tagged fields: fields may be optional.
         if event_code == 'PRIVCOUNT_CIRCUIT_CELL':
-            return self._handle_tagged_event(event_code, items)
+            rv = self._handle_tagged_event(event_code, items)
 
         # these events have positional fields: order matters
         elif event_code == 'PRIVCOUNT_STREAM_BYTES_TRANSFERRED':
             if len(items) == Aggregator.STREAM_BYTES_ITEMS:
-                return self._handle_bytes_event(items[:Aggregator.STREAM_BYTES_ITEMS])
+                rv = self._handle_bytes_event(items[:Aggregator.STREAM_BYTES_ITEMS])
             else:
                 logging.warning("Rejected malformed {} event"
                                 .format(event_code))
-                return False
+                rv = False
 
         elif event_code == 'PRIVCOUNT_STREAM_ENDED':
             if len(items) == Aggregator.STREAM_ENDED_ITEMS:
-                return self._handle_stream_event(items[:Aggregator.STREAM_ENDED_ITEMS])
+                rv = self._handle_stream_event(items[:Aggregator.STREAM_ENDED_ITEMS])
             else:
                 logging.warning("Rejected malformed {} event"
                                 .format(event_code))
-                return False
+                rv = False
 
         elif event_code == 'PRIVCOUNT_CIRCUIT_ENDED':
             if len(items) == Aggregator.CIRCUIT_ENDED_ITEMS:
                 # Since 1.1.0, this legacy event is ignored, and the
                 # fields are taken from PRIVCOUNT_CIRCUIT_CLOSE
-                return True
+                rv = True
             else:
                 # Warn, but don't quit the connection
                 logging.warning("Rejected malformed {} event"
                                 .format(event_code))
-                return True
+                rv = True
 
         elif event_code == 'PRIVCOUNT_CONNECTION_ENDED':
             if len(items) == Aggregator.CONNECTION_ENDED_ITEMS:
-                return self._handle_connection_event(items[:Aggregator.CONNECTION_ENDED_ITEMS])
+                rv = self._handle_connection_event(items[:Aggregator.CONNECTION_ENDED_ITEMS])
             else:
                 logging.warning("Rejected malformed {} event"
                                 .format(event_code))
-                return False
+                rv = False
         # These events have tagged fields: fields may be optional.
         else:
-            return self._handle_tagged_event(event_code, items)
+            rv = self._handle_tagged_event(event_code, items)
 
         # TODO: secure delete
         #del items
         #del fields
 
-        return True
+        # time how long it takes to handle an event
+        elapsed_time = clock() - start_time
+
+        if elapsed_time > Aggregator.MAX_EVENT_HANDLING_TIME:
+            logging.warning("Long {} handling time: {:.1f} seconds exceeds limit of {:.1f} seconds."
+                            .format(event_code, elapsed_time,
+                                    Aggregator.MAX_EVENT_HANDLING_TIME))
+        return rv
 
     def _handle_tagged_event(self, event_code, items):
         '''
         Handle an event with tagged fields.
         '''
+
+        # time how long it takes to parse and process a tagged event
+        start_time = clock()
 
         if (event_code == 'PRIVCOUNT_CIRCUIT_CELL' or
             event_code == 'PRIVCOUNT_CIRCUIT_CLOSE' or
@@ -1006,24 +1022,42 @@ class Aggregator(ReconnectingClientFactory):
         else:
             logging.warning("Unexpected {} event when parsing: '{}'"
                             .format(event_code, " ".join(items)))
-            return True
+            rv = True
+
+        parse_time = clock()
 
         # malformed: handle by warning and ignoring
         if len(items) > 0 and len(fields) == 0:
             logging.warning("Ignored malformed {} event: '{}'"
                           .format(event_code, " ".join(items)))
-            return True
+            rv = True
         elif event_code == 'PRIVCOUNT_CIRCUIT_CELL':
-            return self._handle_circuit_cell_event(fields)
+            rv = self._handle_circuit_cell_event(fields)
         elif event_code == 'PRIVCOUNT_CIRCUIT_CLOSE':
-            return self._handle_circuit_close_event(fields)
+            #logging.warning("Circuit close fields: {}".format(fields))
+            rv = self._handle_circuit_close_event(fields)
         elif event_code == 'PRIVCOUNT_HSDIR_CACHE_STORE':
-            return self._handle_hsdir_stored_event(fields)
+            rv = self._handle_hsdir_stored_event(fields)
         else:
             logging.warning("Unexpected {} event when handling: '{}'"
                             .format(event_code, " ".join(items)))
-            return True
-        return True
+            rv = True
+
+        # time how long it takes to parse and process an event
+        parse_elapsed = parse_time - start_time
+        process_elapsed = clock() - parse_time
+
+        if parse_elapsed > Aggregator.MAX_EVENT_HANDLING_TIME:
+            logging.warning("Long {} parsing time: {:.1f} seconds exceeds limit of {:.1f} seconds."
+                            .format(event_code, parse_elapsed,
+                                    Aggregator.MAX_EVENT_HANDLING_TIME))
+
+        if process_elapsed > Aggregator.MAX_EVENT_HANDLING_TIME:
+            logging.warning("Long {} processing time: {:.1f} seconds exceeds limit of {:.1f} seconds."
+                            .format(event_code, process_elapsed,
+                                    Aggregator.MAX_EVENT_HANDLING_TIME))
+
+        return rv
 
     STREAM_BYTES_ITEMS = 6
 
@@ -2365,9 +2399,14 @@ class Aggregator(ReconnectingClientFactory):
                 assert not is_end
                 # run classifiers and increment counters
                 self._handle_circuit_classify(fields, event_desc)
+            else:
+                logging.warning("Not mid")
 
             # we are done with the circuit, make sure classify state is cleared
             self._try_to_clear_classify_info(fields, event_desc)
+
+        else:
+            logging.warning("No models")
 
         # we processed and handled the event
         return True
@@ -2377,11 +2416,14 @@ class Aggregator(ReconnectingClientFactory):
         # and increment the appropriate counters
         # this must be run only when we are on is_mid circuits
 
+        start_time = clock()
+
         # we need valid IDs to continue
         chan_id, circ_id = self._get_valid_classify_ids(fields, event_desc)
 
         if chan_id is None or circ_id is None:
             # some error with the flags or values
+            logging.warning("No ids")
             return
 
         # check if we have a cell list for the circuit
@@ -2393,6 +2435,7 @@ class Aggregator(ReconnectingClientFactory):
 
         # don't calssify or increment anything without a cell list
         if cell_list == None:
+            logging.warning("No cells")
             return
 
         # previous and next node info
@@ -2401,6 +2444,7 @@ class Aggregator(ReconnectingClientFactory):
 
         # if either of the nodes are None, we don't have enough to classify correctly
         if prev_node is None or next_node is None:
+            logging.warning("Not mid info")
             return
 
         # at this point we have enough to classify
@@ -2420,6 +2464,14 @@ class Aggregator(ReconnectingClientFactory):
         # don't count our crawler circuits that are not used to fetch the facebook onion site
         if (not got_signal) or (got_signal and payload_is_facebook_onion):
             self._increment_counters_classify(circuit, got_signal)
+
+        elapsed_time = clock() - start_time
+
+        if elapsed_time > Aggregator.MAX_EVENT_HANDLING_TIME:
+            logging.warning("Long {} classify time: {:.1f} seconds exceeds limit of {:.1f} seconds."
+                            .format(event_code, elapsed_time,
+                                    Aggregator.MAX_EVENT_HANDLING_TIME))
+
         return
 
     def _get_node_for_classify(self, fields, event_desc, prefix):
@@ -2498,6 +2550,14 @@ class Aggregator(ReconnectingClientFactory):
         assert self.position_model is not None
         assert self.webpage_model is not None
 
+        position_start_time = None
+        position_end_time = None
+
+        webpage_start_time = None
+        webpage_end_time = None
+
+        purpose_start_time = start_time = clock()
+
         # got_signal means the circuit was built by our own client and
         # the destination was the facebook onion site
 
@@ -2509,6 +2569,8 @@ class Aggregator(ReconnectingClientFactory):
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
         is_rend_purp, rend_purp_confidence = self.purpose_model.predict(circuit)
+
+        purpose_end_time = clock()
 
         # count number of circuits we ran through our purpose classifier
         self.secure_counters.increment(
@@ -2547,9 +2609,13 @@ class Aggregator(ReconnectingClientFactory):
                                 bin=SINGLE_BIN,
                                 inc=1)
 
+            position_start_time = clock()
+
             # count position classification, but only for rend circuits
             # ignore the confidence, the classifier already used it to decide
             is_cgm_pos, cgm_pos_confidence =  self.position_model.predict(circuit)
+
+            position_end_time = clock()
 
             # number of position predictions is same as MidPredictRendPurposeCircuitCount
 
@@ -2570,9 +2636,13 @@ class Aggregator(ReconnectingClientFactory):
                                       bin=SINGLE_BIN,
                                       inc=1)
 
+                webpage_start_time = clock()
+
                 # count site classification, but only for rend purpose and cgm position
                 # ignore the confidence, the classifier already used it to decide
                 is_fb_site, fb_site_confidence = self.webpage_model.predict(circuit)
+
+                webpage_end_time = clock()
 
                 # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount
 
@@ -2643,6 +2713,23 @@ class Aggregator(ReconnectingClientFactory):
                                 'MidNoSignalPredictNotRendPurposeCircuitCount',
                                 bin=SINGLE_BIN,
                                 inc=1)
+
+        elapsed_time = clock() - start_time
+        purpose_elapsed_time = purpose_end_time - purpose_start_time
+        position_elapsed_time = 0.0
+        if position_end_time is not None and position_start_time is not None:
+            position_elapsed_time = position_end_time - position_start_time
+        webpage_elapsed_time = 0.0
+        if webpage_end_time is not None and webpage_start_time is not None:
+            webpage_elapsed_time = webpage_end_time - webpage_start_time
+
+        if elapsed_time > Aggregator.MAX_EVENT_HANDLING_TIME:
+            logging.warning("Long {} predict time: {:.1f} seconds exceeds limit of {:.1f} seconds. Breakdown: purpose: {:.1f} position: {:.1f} webpage: {:.1f}."
+                            .format(event_code, elapsed_time,
+                                    Aggregator.MAX_EVENT_HANDLING_TIME,
+                                    purpose_elapsed_time,
+                                    position_elapsed_time,
+                                    webpage_elapsed_time))
 
         return
 
