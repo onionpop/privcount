@@ -2439,8 +2439,8 @@ class Aggregator(ReconnectingClientFactory):
             return
 
         # previous and next node info
-        prev_node = self._get_node_for_classify(fields, event_dec, prefix="Previous")
-        next_node = self._get_node_for_classify(fields, event_dec, prefix="Next")
+        prev_node = self._get_node_for_classify(fields, event_desc, prefix="Previous")
+        next_node = self._get_node_for_classify(fields, event_desc, prefix="Next")
 
         # if either of the nodes are None, we don't have enough to classify correctly
         if prev_node is None or next_node is None:
