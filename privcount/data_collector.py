@@ -2431,7 +2431,7 @@ class Aggregator(ReconnectingClientFactory):
             fields, event_desc)
         fp = get_string_value("{}NodeFingerprint".format(prefix),
             fields, event_desc)
-        fl = get_list_value("{}NodeFlagList".format(prefix),
+        fl = get_list_value("{}NodeRelayFlagList".format(prefix),
             fields, event_desc)
 
         # the classifiers only need the exit and guard flags, so we
