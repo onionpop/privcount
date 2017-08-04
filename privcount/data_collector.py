@@ -27,7 +27,7 @@ from privcount.traffic_model import TrafficModel, check_traffic_model_config
 from privcount.facebook_asn import is_facebook_asn
 
 # imports for classification code
-from onionpop.features import Node, Cell, Circuit
+from onionpop.features import Node, Cell, Circuit, Features
 from onionpop.pipeline import Model
 
 SINGLE_BIN = SecureCounters.SINGLE_BIN
@@ -2539,9 +2539,12 @@ class Aggregator(ReconnectingClientFactory):
         #             and facebook_site as is_fb_site
         # (cgm is the client-guard-middle, i.e. the 2nd relay from the client)
 
+        # turn the circuit into a features object that will be passed to the classifiers
+        features = Features(circuit)
+
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
-        is_rend_purp, _ = self.purpose_model.predict(circuit)
+        is_rend_purp, _ = self.purpose_model.predict(features)
 
         # count number of circuits we ran through our purpose classifier
         self.secure_counters.increment(
@@ -2582,7 +2585,7 @@ class Aggregator(ReconnectingClientFactory):
 
             # count position classification, but only for rend circuits
             # ignore the confidence, the classifier already used it to decide
-            is_cgm_pos, _ =  self.position_model.predict(circuit)
+            is_cgm_pos, _ =  self.position_model.predict(features)
 
             # number of position predictions is same as MidPredictRendPurposeCircuitCount
 
@@ -2605,7 +2608,7 @@ class Aggregator(ReconnectingClientFactory):
 
                 # count site classification, but only for rend purpose and cgm position
                 # ignore the confidence, the classifier already used it to decide
-                is_fb_site, _ = self.webpage_model.predict(circuit)
+                is_fb_site, _ = self.webpage_model.predict(features)
 
                 # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount
 
