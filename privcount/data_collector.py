@@ -27,7 +27,7 @@ from privcount.traffic_model import TrafficModel, check_traffic_model_config
 from privcount.facebook_asn import is_facebook_asn
 
 # imports for classification code
-from onionpop.features import Node, Cell, Circuit, Features
+from onionpop.features import Node, Cell, Circuit
 from onionpop.pipeline import Model
 
 SINGLE_BIN = SecureCounters.SINGLE_BIN
@@ -2424,7 +2424,7 @@ class Aggregator(ReconnectingClientFactory):
             # it will be cleared after we return
             cell_list = self.classify_info[chan_id][circ_id]
 
-        # don't calssify or increment anything without a cell list
+        # don't classify or increment anything without a cell list
         if cell_list == None:
             return
 
