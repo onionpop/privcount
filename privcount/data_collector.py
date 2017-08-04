@@ -1926,8 +1926,7 @@ class Aggregator(ReconnectingClientFactory):
         if relay_command is None:
             relay_command = "UNKNOWN"
 
-        # if we get here, we have all of the fields we need
-        cell = Cell(chan_id, circ_id, timestamp, cell_command, relay_command, is_sent, is_outbound)
+        # if we get here, we have all of the fields we need for the cell
 
         # we want to store the list of cells for each circuit
         # we will process them when the circuit ends
@@ -1935,7 +1934,9 @@ class Aggregator(ReconnectingClientFactory):
 
         # set hard upper bound on cell list size to avoid crazy memory usage
         if len(self.classify_info[chan_id][circ_id]) < 200000: # 200k cells, roughly 100 MiB
-            self.classify_info[chan_id][circ_id].append(cell)
+            cell_to_store = Cell(chan_id, circ_id, timestamp,
+                cell_command, relay_command, is_sent, is_outbound)
+            self.classify_info[chan_id][circ_id].append(cell_to_store)
 
         # TODO we should clear the list of cells after some timeout even if we
         # didn't see the circuit end for some reason, in order to avoid
