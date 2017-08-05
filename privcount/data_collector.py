@@ -1916,7 +1916,7 @@ class Aggregator(ReconnectingClientFactory):
         if cell_command is None:
             return
 
-        relay_command = get_string_value("RelayCommandString",
+        relay_command = get_string_value("RelayCellCommandString",
                                  fields, event_desc,
                                  is_mandatory=False,
                                  default="UNKNOWN")
