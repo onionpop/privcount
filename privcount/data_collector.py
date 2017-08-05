@@ -12,12 +12,14 @@ from time import time
 from copy import deepcopy
 from base64 import b64decode
 
+from Queue import Empty
+
 from twisted.internet import task, reactor, ssl
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from privcount.config import normalise_path, choose_secret_handshake_path
 from privcount.connection import connect, disconnect, validate_connection_config, choose_a_connection, get_a_control_password
-from privcount.counter import SecureCounters, counter_modulus, add_counter_limits_to_config, combine_counters, has_noise_weight, get_noise_weight, count_bins, are_events_expected, get_valid_counters
+from privcount.counter import SecureCounters, counter_modulus, add_counter_limits_to_config, combine_counters, has_noise_weight, get_noise_weight, count_bins, are_events_expected, get_valid_counters, get_classify_counter_labels
 from privcount.crypto import get_public_digest_string, load_public_key_string, encrypt
 from privcount.log import log_error, format_delay_time_wait, format_last_event_time_since, format_elapsed_time_since, errorCallback, summarise_string
 from privcount.node import PrivCountClient, EXPECTED_EVENT_INTERVAL_MAX, EXPECTED_CONTROL_ESTABLISH_MAX
@@ -49,6 +51,20 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         self.is_aggregator_pending = False
         self.context = {}
         self.expected_aggregator_start_time = None
+
+        # objects specific to machine learning code
+        # see set_machine_learning_pipes
+        self.ml_dc_id = None
+        self.ml_req_q = None
+        self.ml_res_q = None
+
+    def set_machine_learning_pipes(self, dc_id, req_q, res_q):
+        # the dc id is required for every ml request
+        self.ml_dc_id = dc_id
+        # req_q is where the dc will send prediction requests
+        self.ml_req_q = req_q
+        # res_q is where the MLDCRunner will send responses
+        self.ml_res_q = res_q
 
     def buildProtocol(self, addr):
         '''
@@ -250,29 +266,6 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         if 'traffic_model' in config:
             traffic_model_config = config['traffic_model']
 
-        # pass the classification models to the aggregator
-        position_model_path = None
-        if 'position_model' in self.config:
-            p = os.path.expanduser(self.config['position_model'])
-            if os.path.exists(p):
-                position_model_path = p
-            else:
-                logging.warning('position model path given but path {} does not exist'.format(p))
-        purpose_model_path = None
-        if 'purpose_model' in self.config:
-            p = os.path.expanduser(self.config['purpose_model'])
-            if os.path.exists(p):
-                purpose_model_path = p
-            else:
-                logging.warning('purpose model path given but path {} does not exist'.format(p))
-        webpage_model_path = None
-        if 'webpage_model' in self.config:
-            p = os.path.expanduser(self.config['webpage_model'])
-            if os.path.exists(p):
-                webpage_model_path = p
-            else:
-                logging.warning('webpage model path given but path {} does not exist'.format(p))
-
         # The aggregator doesn't care about the DC threshold
         self.aggregator = Aggregator(dc_counters,
                                      traffic_model_config,
@@ -283,9 +276,7 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
                                      self.config['rotate_period'],
                                      self.config['use_setconf'],
                                      config.get('circuit_sample_rate', 1.0),
-                                     position_model_path,
-                                     purpose_model_path,
-                                     webpage_model_path)
+                                     self.ml_dc_id, self.ml_req_q, self.ml_res_q)
         defer_time = config['defer_time'] if 'defer_time' in config else 0.0
         logging.info("got start command from tally server, starting aggregator in {}".format(format_delay_time_wait(defer_time, 'at')))
         self.expected_aggregator_start_time = time() + defer_time
@@ -439,7 +430,7 @@ class Aggregator(ReconnectingClientFactory):
     def __init__(self, counters, traffic_model_config, sk_uids,
                  noise_weight, modulus, tor_control_port, rotate_period,
                  use_setconf, circuit_sample_rate,
-                 position_model_path, purpose_model_path, webpage_model_path):
+                 ml_dc_id, ml_req_q, ml_res_q):
         self.secure_counters = SecureCounters(counters, modulus,
                                               require_generate_noise=True)
         self.collection_counters = counters
@@ -452,39 +443,11 @@ class Aggregator(ReconnectingClientFactory):
         if traffic_model_config is not None:
             self.traffic_model = TrafficModel(traffic_model_config)
 
-        # load the optional pre-trained classifier models
-        # we will use these during the circuit end event
-        self.position_model = None
-        if position_model_path is not None:
-            config = {
-                "dataset": position_model_path,
-                "classifier": "PositionClassifier",
-                "params": {"n_estimators": 30}
-            }
-            self.position_model = Model(config)
-            self.position_model.train()
-
-        self.purpose_model = None
-        if purpose_model_path is not None:
-            config = {
-                "dataset": purpose_model_path,
-                "classifier": "PurposeClassifier",
-                "params": {"n_estimators": 30}
-            }
-            self.purpose_model = Model(config)
-            self.purpose_model.train()
-
-        self.webpage_model = None
-        if webpage_model_path is not None:
-            config = {
-                "dataset": webpage_model_path,
-                "classifier": "OneClassCUMUL",
-                "params": {"nu": 0.2, "kernel": "rbf", "gamma": 10}
-            }
-            self.webpage_model = Model(config)
-            self.webpage_model.train()
-
         self.classify_info = {}
+        self.wants_predictions = self.are_classify_counters_configured()
+        self.ml_dc_id = ml_dc_id
+        self.ml_req_q = ml_req_q
+        self.ml_res_q = ml_res_q
 
         self.noise_weight_config = noise_weight
         self.noise_weight_value = None
@@ -515,6 +478,15 @@ class Aggregator(ReconnectingClientFactory):
         self.address = None
         self.fingerprint = None
         self.flag_list = []
+
+    def are_classify_counters_configured(self):
+        classify_labels = get_classify_counter_labels()
+
+        # true if at least one classify counter is enabled
+        for label in self.collection_counters:
+            if label in classify_labels:
+                return True
+        return False
 
     def buildProtocol(self, addr):
         if self.protocol is not None:
@@ -1870,9 +1842,9 @@ class Aggregator(ReconnectingClientFactory):
                                                bin=SINGLE_BIN,
                                                inc=1)
 
-        # if we have loaded classification models, store cell for later
-        if self.purpose_model != None and self.position_model != None and \
-            self.webpage_model is not None:
+        # if we are running classification models, store cell for later
+        if self.ml_dc_id != None and self.ml_req_q != None and \
+            self.ml_res_q != None and self.wants_predictions:
 
             # save the cell for classification at the point when the circuit ends
             # but only for mid circuits, since those are the only ones we need
@@ -2386,9 +2358,8 @@ class Aggregator(ReconnectingClientFactory):
                                           bin=SINGLE_BIN,
                                           inc=1)
 
-        # if we have loaded classification models, process the circuit and its cells
-        if self.purpose_model != None and self.position_model != None and \
-            self.webpage_model is not None:
+        # if we can predict and want predictions, process the circuit and its cells
+        if self.ml_dc_id is not None and self.wants_predictions:
             # we only want to run classification on circuits that we
             # did not originate and that we serve in the middle
             if is_mid:
@@ -2527,11 +2498,25 @@ class Aggregator(ReconnectingClientFactory):
             if len(self.classify_info[chan_id]) == 0:
                 self.classify_info.pop(chan_id, None)
 
-    def _increment_counters_classify(self, circuit, got_signal):
-        assert self.purpose_model is not None
-        assert self.position_model is not None
-        assert self.webpage_model is not None
+    def _predict(self, task):
+        # make sure our response queue is empty
+        try:
+            while True:
+                self.ml_res_q.get(block=False)
+        except Empty:
+            # queue is empty and a timeout occurred before an item was added
+            # check for stopage and try again
+            pass
 
+        # send the prediction task
+        self.ml_req_q.put(task, block=True, timeout=None)
+
+        # collect the result
+        result = self.ml_res_q.get(block=True, timeout=None)
+        prediction = result[0]
+        return prediction
+
+    def _increment_counters_classify(self, circuit, got_signal):
         # got_signal means the circuit was built by our own client and
         # the destination was the facebook onion site
 
@@ -2545,7 +2530,8 @@ class Aggregator(ReconnectingClientFactory):
 
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
-        is_rend_purp, _ = self.purpose_model.predict(features)
+        prediction = self._predict([self.ml_dc_id, 'purpose', features])
+        is_rend_purp = True if prediction is True else False
 
         # count number of circuits we ran through our purpose classifier
         self.secure_counters.increment(
@@ -2586,7 +2572,8 @@ class Aggregator(ReconnectingClientFactory):
 
             # count position classification, but only for rend circuits
             # ignore the confidence, the classifier already used it to decide
-            is_cgm_pos, _ =  self.position_model.predict(features)
+            prediction = self._predict([self.ml_dc_id, 'position', features])
+            is_cgm_pos = True if prediction is True else False
 
             # number of position predictions is same as MidPredictRendPurposeCircuitCount
 
@@ -2609,7 +2596,8 @@ class Aggregator(ReconnectingClientFactory):
 
                 # count site classification, but only for rend purpose and cgm position
                 # ignore the confidence, the classifier already used it to decide
-                is_fb_site, _ = self.webpage_model.predict(features)
+                prediction = self._predict([self.ml_dc_id, 'webpage', features])
+                is_fb_site = True if prediction is True else False
 
                 # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount
 
