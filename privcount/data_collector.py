@@ -1847,15 +1847,11 @@ class Aggregator(ReconnectingClientFactory):
             self.ml_res_q != None and self.wants_predictions:
 
             # save the cell for classification at the point when the circuit ends
-            # but only for mid circuits, since those are the only ones we need
-            # to run classification code on
-            is_mid = get_flag_value("IsMidFlag",
-                                    fields, event_desc,
-                                    is_mandatory=False,
-                                    default=False)
-
-            if is_mid:
-                self._handle_cell_classify(fields, event_desc, is_sent)
+            # we can't filter on mid circutis, because we can't reliably detect our
+            # position on the first cells in the circuit (we think we are at the
+            # End of the circuit when the first extend cells arrive, even if we
+            # are going to be a circuit middle node)
+            self._handle_cell_classify(fields, event_desc, is_sent)
 
         # we processed and handled the event
         return True
@@ -1888,15 +1884,12 @@ class Aggregator(ReconnectingClientFactory):
         if cell_command is None:
             return
 
+        # make extra sure we don't discard cells where we cant read the
+        # relay_command by giving a default value here
         relay_command = get_string_value("RelayCellCommandString",
                                  fields, event_desc,
                                  is_mandatory=False,
                                  default="UNKNOWN")
-        # make extra sure we don't discard cells where we cant read the relay_command
-        # this should have already been done in `get_string_value` because we sent
-        # in a default string, but do it here again to be certain
-        if relay_command is None:
-            relay_command = "UNKNOWN"
 
         # if we get here, we have all of the fields we need for the cell
 
@@ -2359,7 +2352,8 @@ class Aggregator(ReconnectingClientFactory):
                                           inc=1)
 
         # if we can predict and want predictions, process the circuit and its cells
-        if self.ml_dc_id is not None and self.wants_predictions:
+        if self.ml_dc_id != None and self.ml_req_q != None and \
+            self.ml_res_q != None and self.wants_predictions:
             # we only want to run classification on circuits that we
             # did not originate and that we serve in the middle
             if is_mid:
