@@ -80,7 +80,7 @@ class MLDCRunner(object):
             logging.warning("config contained invalid options, please try again")
             return
 
-        # prepare (train) the models immediately if they are specified
+        # configure the models immediately if they are specified
         self._prepare_models()
 
         # if we have at least one model, we will need to faciliate predictions
@@ -91,6 +91,11 @@ class MLDCRunner(object):
 
         # start all data collectors
         self._start_data_collectors()
+
+        # train the models if they are specified
+        # this is done after starting the data collectors so that the
+        # forked DC processes have lower memory overhead
+        self._train_models()
 
         # now run the main loop
         self._loop()
@@ -169,11 +174,8 @@ class MLDCRunner(object):
                 "classifier": "PositionClassifier",
                 "params": {"n_estimators": 30}
             }
-            logging.info("loading machine learning position model")
+            logging.info("configuring machine learning position model")
             self.position_model = Model(config)
-            logging.info("training machine learning position model")
-            self.position_model.train()
-            logging.info("finished preparing machine learning position model")
 
         if 'purpose_model' in self.config:
             self.purpose_model_path = normalise_path(self.config['purpose_model'])
@@ -182,11 +184,8 @@ class MLDCRunner(object):
                 "classifier": "PurposeClassifier",
                 "params": {"n_estimators": 30}
             }
-            logging.info("loading machine learning purpose model")
+            logging.info("configuring machine learning purpose model")
             self.purpose_model = Model(config)
-            logging.info("training machine learning purpose model")
-            self.purpose_model.train()
-            logging.info("finished preparing machine learning purpose model")
 
         if 'webpage_model' in self.config:
             self.webpage_model_path = normalise_path(self.config['webpage_model'])
@@ -195,11 +194,26 @@ class MLDCRunner(object):
                 "classifier": "OneClassCUMUL",
                 "params": {"nu": 0.2, "kernel": "rbf", "gamma": 10}
             }
-            logging.info("loading machine learning webpage model")
+            logging.info("configuring machine learning webpage model")
             self.webpage_model = Model(config)
+
+    def _train_models(self):
+        logging.info("training machine learning models now")
+
+        if self.position_model is not None:
+            logging.info("training machine learning position model")
+            self.position_model.train()
+            logging.info("finished training machine learning position model")
+
+        if self.purpose_model is not None:
+            logging.info("training machine learning purpose model")
+            self.purpose_model.train()
+            logging.info("finished training machine learning purpose model")
+
+        if self.webpage_model is not None:
             logging.info("training machine learning webpage model")
             self.webpage_model.train()
-            logging.info("finished preparing machine learning webpage model")
+            logging.info("finished training machine learning webpage model")
 
     def _start_data_collectors(self):
         logging.info("creating and starting child data collector processes now")
@@ -255,20 +269,35 @@ class MLDCRunner(object):
 
             outq = self.dcqmap[dc_id]
 
+            # every request should have a response
+            result = False
+
             if command == 'purpose':
-                is_rend_purp, _ = self.purpose_model.predict(features)
-                outq.put([is_rend_purp])
+                if self.purpose_model is not None:
+                    is_rend_purp, _ = self.purpose_model.predict(features)
+                    result = is_rend_purp
+                else:
+                    logging.warning("dc {} requested purpose prediction but no purpose model was configured".format(dc_id))
 
             elif command == 'position':
-                is_cgm_pos, _ =  self.position_model.predict(features)
-                outq.put([is_cgm_pos])
+                if self.position_model is not None:
+                    is_cgm_pos, _ =  self.position_model.predict(features)
+                    result = is_cgm_pos
+                else:
+                    logging.warning("dc {} requested position prediction but no position model was configured".format(dc_id))
 
             elif command == 'webpage':
-                is_fb_site, _ = self.webpage_model.predict(features)
-                outq.put([is_fb_site])
+                if self.webpage_model is not None:
+                    is_fb_site, _ = self.webpage_model.predict(features)
+                    result = is_fb_site
+                else:
+                    logging.warning("dc {} requested webpage prediction but no webpage model was configured".format(dc_id))
 
             else:
                 logging.warning("got unrecognized command '{}' from dc {}".format(command, dc_id))
+
+            # every request should have a response
+            outq.put([result])
 
 	    self.num_tasks_processed += 1
 
