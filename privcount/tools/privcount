@@ -71,6 +71,15 @@ def main():
         metavar="CONFIG_PATH", type=type_str_path_in,
         action="store", dest="configpath")
 
+    # machine learning data collector runner
+    # run one or more data collectors that can use machine learning to classify position/purpose/webpage
+    mldc_parser = sub_parser.add_parser('mldc', help="run PrivCount classifying data collectors", formatter_class=help_formatter)
+    mldc_parser.set_defaults(mode='mldc', func=machlearn_data_collector, formatter_class=help_formatter)
+    mldc_parser.add_argument(# '-c', '--config',
+        help="""a file path to a PrivCount config file, may be '-' for STDIN""",
+        metavar="CONFIG_PATH", type=type_str_path_in,
+        action="store", dest="configpath")
+
     # inject events
     inject_parser = sub_parser.add_parser('inject', help="run a server that emulates the Tor control protocol to inject events into a runnning PrivCount data collector", formatter_class=help_formatter)
     inject_parser.set_defaults(mode='inject', func=inject, formatter_class=help_formatter)
@@ -93,8 +102,14 @@ def main():
     if args.quiet:
         loglevel = logging.WARNING
 
-    logging.basicConfig(filename=logfile_path, level=loglevel, datefmt='%Y-%m-%d %H:%M:%S',
-        format='%(asctime)s %(created)f [privcount-{0}{1}] [%(levelname)s] %(message)s'.format(args.mode, args.logid))
+    if args.mode == 'mldc':
+        logging.basicConfig(filename=logfile_path, level=loglevel, datefmt='%Y-%m-%d %H:%M:%S',
+            format='%(asctime)s %(created)f [privcount-{0}{1}-%(processName)s] [%(levelname)s] %(message)s'.format(args.mode, args.logid))
+    	import multiprocessing_logging
+    	multiprocessing_logging.install_mp_handler()
+    else:
+        logging.basicConfig(filename=logfile_path, level=loglevel, datefmt='%Y-%m-%d %H:%M:%S',
+            format='%(asctime)s %(created)f [privcount-{0}{1}] [%(levelname)s] %(message)s'.format(args.mode, args.logid))
 
     if logfile_path is not None:
         print "privcount: output redirected to '{0}'".format(logfile_path)
@@ -114,6 +129,12 @@ def main():
 def data_collector(args):
     from privcount.data_collector import DataCollector
     DataCollector(args.configpath).run()
+
+def machlearn_data_collector(args):
+    from privcount.mldc_runner import MLDCRunner
+    mldc = MLDCRunner(args.configpath)
+    if mldc is not None:
+        mldc.run()
 
 def tally_server(args):
     from privcount.tally_server import TallyServer

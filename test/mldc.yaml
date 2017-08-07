@@ -1,0 +1,12 @@
+dcs:
+- config: dc4/config.yaml
+  rundir: dc4
+- config: dc5/config.yaml
+  rundir: dc5
+- config: dc6/config.yaml
+  rundir: dc6
+- config: dc7/config.yaml
+  rundir: dc7
+position_model: 'position.features.libsvm'
+purpose_model: 'purpose.features.libsvm'
+webpage_model: 'webpage.features.libsvm'

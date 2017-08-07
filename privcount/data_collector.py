@@ -12,12 +12,14 @@ from time import time, clock
 from copy import deepcopy
 from base64 import b64decode
 
+from Queue import Empty
+
 from twisted.internet import task, reactor, ssl
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from privcount.config import normalise_path, choose_secret_handshake_path
 from privcount.connection import connect, disconnect, validate_connection_config, choose_a_connection, get_a_control_password
-from privcount.counter import SecureCounters, counter_modulus, add_counter_limits_to_config, combine_counters, has_noise_weight, get_noise_weight, count_bins, are_events_expected, get_valid_counters
+from privcount.counter import SecureCounters, counter_modulus, add_counter_limits_to_config, combine_counters, has_noise_weight, get_noise_weight, count_bins, are_events_expected, get_valid_counters, get_classify_counter_labels
 from privcount.crypto import get_public_digest_string, load_public_key_string, encrypt
 from privcount.log import log_error, format_delay_time_wait, format_last_event_time_since, format_elapsed_time_since, errorCallback, summarise_string
 from privcount.node import PrivCountClient, EXPECTED_EVENT_INTERVAL_MAX, EXPECTED_CONTROL_ESTABLISH_MAX
@@ -28,7 +30,7 @@ from privcount.facebook_asn import is_facebook_asn
 
 # imports for classification code
 from onionpop.features import Node, Cell, Circuit, Features
-from onionpop.pipeline import MiddleEarthModel
+from onionpop.pipeline import Model
 
 SINGLE_BIN = SecureCounters.SINGLE_BIN
 
@@ -49,6 +51,20 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         self.is_aggregator_pending = False
         self.context = {}
         self.expected_aggregator_start_time = None
+
+        # objects specific to machine learning code
+        # see set_machine_learning_pipes
+        self.ml_dc_id = None
+        self.ml_req_q = None
+        self.ml_res_q = None
+
+    def set_machine_learning_pipes(self, dc_id, req_q, res_q):
+        # the dc id is required for every ml request
+        self.ml_dc_id = dc_id
+        # req_q is where the dc will send prediction requests
+        self.ml_req_q = req_q
+        # res_q is where the MLDCRunner will send responses
+        self.ml_res_q = res_q
 
     def buildProtocol(self, addr):
         '''
@@ -250,17 +266,6 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
         if 'traffic_model' in config:
             traffic_model_config = config['traffic_model']
 
-        # pass the classification models to the aggregator
-        position_model_path = None
-        if 'position_model' in self.config:
-            position_model_path = self.config['position_model']
-        purpose_model_path = None
-        if 'purpose_model' in self.config:
-            purpose_model_path = self.config['purpose_model']
-        webpage_model_path = None
-        if 'webpage_model' in self.config:
-            webpage_model_path = self.config['webpage_model']
-
         # The aggregator doesn't care about the DC threshold
         self.aggregator = Aggregator(dc_counters,
                                      traffic_model_config,
@@ -271,9 +276,7 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
                                      self.config['rotate_period'],
                                      self.config['use_setconf'],
                                      config.get('circuit_sample_rate', 1.0),
-                                     position_model_path,
-                                     purpose_model_path,
-                                     webpage_model_path)
+                                     self.ml_dc_id, self.ml_req_q, self.ml_res_q)
         defer_time = config['defer_time'] if 'defer_time' in config else 0.0
         logging.info("got start command from tally server, starting aggregator in {}".format(format_delay_time_wait(defer_time, 'at')))
         self.expected_aggregator_start_time = time() + defer_time
@@ -427,7 +430,7 @@ class Aggregator(ReconnectingClientFactory):
     def __init__(self, counters, traffic_model_config, sk_uids,
                  noise_weight, modulus, tor_control_port, rotate_period,
                  use_setconf, circuit_sample_rate,
-                 position_model_path, purpose_model_path, webpage_model_path):
+                 ml_dc_id, ml_req_q, ml_res_q):
         self.secure_counters = SecureCounters(counters, modulus,
                                               require_generate_noise=True)
         self.collection_counters = counters
@@ -440,18 +443,11 @@ class Aggregator(ReconnectingClientFactory):
         if traffic_model_config is not None:
             self.traffic_model = TrafficModel(traffic_model_config)
 
-        # load the optional pre-trained classifier models
-        # we will use these during the circuit end event
-        self.position_model = None
-        if position_model_path is not None:
-            self.position_model = MiddleEarthModel.load(position_model_path)
-        self.purpose_model = None
-        if purpose_model_path is not None:
-            self.purpose_model = MiddleEarthModel.load(purpose_model_path)
-        self.webpage_model = None
-        if webpage_model_path is not None:
-            self.webpage_model = MiddleEarthModel.load(webpage_model_path)
         self.classify_info = {}
+        self.wants_predictions = self.are_classify_counters_configured()
+        self.ml_dc_id = ml_dc_id
+        self.ml_req_q = ml_req_q
+        self.ml_res_q = ml_res_q
 
         self.noise_weight_config = noise_weight
         self.noise_weight_value = None
@@ -482,6 +478,15 @@ class Aggregator(ReconnectingClientFactory):
         self.address = None
         self.fingerprint = None
         self.flag_list = []
+
+    def are_classify_counters_configured(self):
+        classify_labels = get_classify_counter_labels()
+
+        # true if at least one classify counter is enabled
+        for label in self.collection_counters:
+            if label in classify_labels:
+                return True
+        return False
 
     def buildProtocol(self, addr):
         if self.protocol is not None:
@@ -1871,34 +1876,57 @@ class Aggregator(ReconnectingClientFactory):
                                                bin=SINGLE_BIN,
                                                inc=1)
 
-        # if we have loaded classification models, store cell for later
-        if self.purpose_model != None and self.position_model != None and \
-            self.webpage_model is not None:
-
-            # save the cell for classification at the point when the circuit ends
-            # but only for mid circuits, since those are the only ones we need
-            # to run classification code on
-            is_mid = get_flag_value("IsMidFlag",
-                                    fields, event_desc,
-                                    is_mandatory=False,
-                                    default=False)
-
-            if is_mid:
-                self._handle_cell_classify(fields, event_desc, is_sent)
+        # if we are running classification models, store cell for later
+        if self.ml_dc_id != None and self.ml_req_q != None and \
+            self.ml_res_q != None and self.wants_predictions:
+            # check if we want to store the cell
+            self._handle_cell_classify(fields, event_desc, is_sent, is_mid)
 
         # we processed and handled the event
         return True
 
-    def _handle_cell_classify(self, fields, event_desc, is_sent):
+    def _handle_cell_classify(self, fields, event_desc, is_sent, is_mid):
         # now get all of the fields that we want to store for the cell
         # if any of them are not present, assume this is not a proper
         # cell that we care about and return
 
-        # since this is a mid circuit, we should have prev chan and circ ids
+        # if this is a mid circuit, we should have prev chan and circ ids
         chan_id, circ_id = self._get_valid_classify_ids(fields, event_desc)
         if chan_id is None or circ_id is None:
             return
 
+        # We only actually want to classify middle circuits and so we don't
+        # need to store cells on non-mid circuits to save RAM.
+        #
+        # However, we can't reliably detect our position on the first few
+        # cells in the circuit (we think we are at the End of the circuit
+        # when the first extend cells arrive, even if we are going to
+        # eventually be a circuit middle node).
+        #
+        # A compromise is to always store cells for mid circuits, and then
+        # for non-mid circuits, only store enough cells until we expect that
+        # our position in the circuit won't change any more.
+        # This way we can have a hard limit on the number of cells we will
+        # store for non-mid circuits.
+
+        # minimize processing overhead for cells we know we don't want
+        if chan_id in self.classify_info and circ_id in self.classify_info[chan_id]:
+            num_cells = len(self.classify_info[chan_id][circ_id])
+            # 10 cells will be enough to tell if we are a middle or not
+            # (i.e., to trust the is_mid flag)
+            if num_cells >= 10 and not is_mid:
+                # these 10 cells will get cleared when the circuit closes
+                return
+
+            # set hard upper bound on cell list size to avoid crazy memory usage
+            if num_cells >= 20000: # 20k cells, roughly 10 MiB
+                # these cells will used in classification when the circuits ends
+                return
+
+        # here we are either one of the first 10 cells on a circuit
+        # or we are a mid circuit cell under the cell limit
+
+        # Now get the remaining fields we need
         timestamp = get_float_value("EventTimestamp",
                                 fields, event_desc,
                                 is_mandatory=False)
@@ -1917,28 +1945,24 @@ class Aggregator(ReconnectingClientFactory):
         if cell_command is None:
             return
 
-        relay_command = get_string_value("RelayCommandString",
+        # make extra sure we don't discard cells where we cant read the
+        # relay_command by giving a default value here
+        relay_command = get_string_value("RelayCellCommandString",
                                  fields, event_desc,
                                  is_mandatory=False,
                                  default="UNKNOWN")
-        # make extra sure we don't discard cells where we cant read the relay_command
-        # this should have already been done in `get_string_value` because we sent
-        # in a default string, but do it here again to be certain
-        if relay_command is None:
-            relay_command = "UNKNOWN"
 
-        # if we get here, we have all of the fields we need
-        cell = Cell(chan_id, circ_id, timestamp, cell_command, relay_command, is_sent, is_outbound)
+        # if we get here, we have all of the fields we need for the cell
 
         # we want to store the list of cells for each circuit
         # we will process them when the circuit ends
-        self.classify_info.setdefault(chan_id, {}).setdefault(circ_id, [])
+        stored_cells = self.classify_info.setdefault(chan_id, {}).setdefault(circ_id, [])
 
-        # set hard upper bound on cell list size to avoid crazy memory usage
-        if len(self.classify_info[chan_id][circ_id]) < 200000: # 200k cells, roughly 100 MiB
-            self.classify_info[chan_id][circ_id].append(cell)
+        cell_to_store = Cell(chan_id, circ_id, timestamp,
+                            cell_command, relay_command, is_sent, is_outbound)
+        stored_cells.append(cell_to_store)
 
-        # TODO we should clear the list of cells after some timeout even if we
+        # TODO we should clear the stored_cells after some timeout even if we
         # didn't see the circuit end for some reason, in order to avoid
         # consuming too much memory. This could be done with a twisted timer.
         return
@@ -2386,9 +2410,9 @@ class Aggregator(ReconnectingClientFactory):
                                           bin=SINGLE_BIN,
                                           inc=1)
 
-        # if we have loaded classification models, process the circuit and its cells
-        if self.purpose_model != None and self.position_model != None and \
-            self.webpage_model is not None:
+        # if we can predict and want predictions, process the circuit and its cells
+        if self.ml_dc_id != None and self.ml_req_q != None and \
+            self.ml_res_q != None and self.wants_predictions:
             # we only want to run classification on circuits that we
             # did not originate and that we serve in the middle
             if is_mid:
@@ -2433,7 +2457,7 @@ class Aggregator(ReconnectingClientFactory):
             # it will be cleared after we return
             cell_list = self.classify_info[chan_id][circ_id]
 
-        # don't calssify or increment anything without a cell list
+        # don't classify or increment anything without a cell list
         if cell_list == None:
             logging.warning("No cells")
             return
@@ -2548,11 +2572,25 @@ class Aggregator(ReconnectingClientFactory):
             if len(self.classify_info[chan_id]) == 0:
                 self.classify_info.pop(chan_id, None)
 
-    def _increment_counters_classify(self, circuit, got_signal):
-        assert self.purpose_model is not None
-        assert self.position_model is not None
-        assert self.webpage_model is not None
+    def _predict(self, task):
+        # make sure our response queue is empty
+        try:
+            while True:
+                self.ml_res_q.get(block=False)
+        except Empty:
+            # queue is empty and a timeout occurred before an item was added
+            # check for stopage and try again
+            pass
 
+        # send the prediction task
+        self.ml_req_q.put(task, block=True, timeout=None)
+
+        # collect the result
+        result = self.ml_res_q.get(block=True, timeout=None)
+        prediction = result[0]
+        return prediction
+
+    def _increment_counters_classify(self, circuit, got_signal):
         position_start_time = None
         position_end_time = None
 
@@ -2569,9 +2607,13 @@ class Aggregator(ReconnectingClientFactory):
         #             and facebook_site as is_fb_site
         # (cgm is the client-guard-middle, i.e. the 2nd relay from the client)
 
+        # turn the circuit into a features object that will be passed to the classifiers
+        features = Features(circuit)
+
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
-        is_rend_purp, rend_purp_confidence = self.purpose_model.predict(circuit)
+        prediction = self._predict([self.ml_dc_id, 'purpose', features])
+        is_rend_purp = True if prediction is True else False
 
         purpose_end_time = clock()
 
@@ -2616,7 +2658,8 @@ class Aggregator(ReconnectingClientFactory):
 
             # count position classification, but only for rend circuits
             # ignore the confidence, the classifier already used it to decide
-            is_cgm_pos, cgm_pos_confidence =  self.position_model.predict(circuit)
+            prediction = self._predict([self.ml_dc_id, 'position', features])
+            is_cgm_pos = True if prediction is True else False
 
             position_end_time = clock()
 
@@ -2643,7 +2686,8 @@ class Aggregator(ReconnectingClientFactory):
 
                 # count site classification, but only for rend purpose and cgm position
                 # ignore the confidence, the classifier already used it to decide
-                is_fb_site, fb_site_confidence = self.webpage_model.predict(circuit)
+                prediction = self._predict([self.ml_dc_id, 'webpage', features])
+                is_fb_site = True if prediction is True else False
 
                 webpage_end_time = clock()
 

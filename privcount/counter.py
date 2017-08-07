@@ -574,6 +574,29 @@ PRIVCOUNT_COUNTER_EVENTS = {
 DEFAULT_DUMMY_COUNTER_NAME : set(),
 }
 
+def get_classify_counter_labels():
+    return set(['MidPredictPurposeCircuitCount',
+        'MidGotSignalPredictPurposeCircuitCount',
+        'MidNoSignalPredictPurposeCircuitCount',
+        'MidPredictRendPurposeCircuitCount',
+        'MidGotSignalPredictRendPurposeCircuitCount',
+        'MidNoSignalPredictRendPurposeCircuitCount',
+        'MidPredictNotRendPurposeCircuitCount',
+        'MidGotSignalPredictNotRendPurposeCircuitCount',
+        'MidNoSignalPredictNotRendPurposeCircuitCount',
+        'MidPredictRendPurposePredictCGMPositionCircuitCount',
+        'MidGotSignalPredictRendPurposePredictCGMPositionCircuitCount',
+        'MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount',
+        'MidPredictRendPurposePredictNotCGMPositionCircuitCount',
+        'MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount',
+        'MidNoSignalPredictRendPurposePredictNotCGMPositionCircuitCount',
+        'MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
+        'MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
+        'MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
+        'MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
+        'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
+        'MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount'])
+
 def register_dynamic_counter(counter_name, counter_events):
     '''
     Register counter_name as a counter which uses the events in counter_events.
