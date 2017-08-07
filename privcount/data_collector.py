@@ -1846,12 +1846,12 @@ class Aggregator(ReconnectingClientFactory):
         if self.ml_dc_id != None and self.ml_req_q != None and \
             self.ml_res_q != None and self.wants_predictions:
             # check if we want to store the cell
-            self._handle_cell_classify(fields, event_desc, is_sent, is_mid)
+            self._handle_cell_classify(fields, event_desc, is_sent)
 
         # we processed and handled the event
         return True
 
-    def _handle_cell_classify(self, fields, event_desc, is_sent, is_mid):
+    def _handle_cell_classify(self, fields, event_desc, is_sent):
         # now get all of the fields that we want to store for the cell
         # if any of them are not present, assume this is not a proper
         # cell that we care about and return
@@ -1877,6 +1877,11 @@ class Aggregator(ReconnectingClientFactory):
 
         # minimize processing overhead for cells we know we don't want
         if chan_id in self.classify_info and circ_id in self.classify_info[chan_id]:
+            is_mid = get_flag_value("IsMidFlag",
+                                    fields, event_desc,
+                                    is_mandatory=False,
+                                    default=False)
+
             num_cells = len(self.classify_info[chan_id][circ_id])
             # 10 cells will be enough to tell if we are a middle or not
             # (i.e., to trust the is_mid flag)
