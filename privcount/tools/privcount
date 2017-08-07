@@ -105,6 +105,8 @@ def main():
     if args.mode == 'mldc':
         logging.basicConfig(filename=logfile_path, level=loglevel, datefmt='%Y-%m-%d %H:%M:%S',
             format='%(asctime)s %(created)f [privcount-{0}{1}-%(processName)s] [%(levelname)s] %(message)s'.format(args.mode, args.logid))
+        import multiprocessing_logging
+        multiprocessing_logging.install_mp_handler()
     else:
         logging.basicConfig(filename=logfile_path, level=loglevel, datefmt='%Y-%m-%d %H:%M:%S',
             format='%(asctime)s %(created)f [privcount-{0}{1}] [%(levelname)s] %(message)s'.format(args.mode, args.logid))
