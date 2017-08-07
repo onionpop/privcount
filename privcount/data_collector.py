@@ -1845,27 +1845,54 @@ class Aggregator(ReconnectingClientFactory):
         # if we are running classification models, store cell for later
         if self.ml_dc_id != None and self.ml_req_q != None and \
             self.ml_res_q != None and self.wants_predictions:
-
-            # save the cell for classification at the point when the circuit ends
-            # we can't filter on mid circutis, because we can't reliably detect our
-            # position on the first cells in the circuit (we think we are at the
-            # End of the circuit when the first extend cells arrive, even if we
-            # are going to be a circuit middle node)
-            self._handle_cell_classify(fields, event_desc, is_sent)
+            # check if we want to store the cell
+            self._handle_cell_classify(fields, event_desc, is_sent, is_mid)
 
         # we processed and handled the event
         return True
 
-    def _handle_cell_classify(self, fields, event_desc, is_sent):
+    def _handle_cell_classify(self, fields, event_desc, is_sent, is_mid):
         # now get all of the fields that we want to store for the cell
         # if any of them are not present, assume this is not a proper
         # cell that we care about and return
 
-        # since this is a mid circuit, we should have prev chan and circ ids
+        # if this is a mid circuit, we should have prev chan and circ ids
         chan_id, circ_id = self._get_valid_classify_ids(fields, event_desc)
         if chan_id is None or circ_id is None:
             return
 
+        # We only actually want to classify middle circuits and so we don't
+        # need to store cells on non-mid circuits to save RAM.
+        #
+        # However, we can't reliably detect our position on the first few
+        # cells in the circuit (we think we are at the End of the circuit
+        # when the first extend cells arrive, even if we are going to
+        # eventually be a circuit middle node).
+        #
+        # A compromise is to always store cells for mid circuits, and then
+        # for non-mid circuits, only store enough cells until we expect that
+        # our position in the circuit won't change any more.
+        # This way we can have a hard limit on the number of cells we will
+        # store for non-mid circuits.
+
+        # minimize processing overhead for cells we know we don't want
+        if chan_id in self.classify_info and circ_id in self.classify_info[chan_id]:
+            num_cells = len(self.classify_info[chan_id][circ_id])
+            # 10 cells will be enough to tell if we are a middle or not
+            # (i.e., to trust the is_mid flag)
+            if num_cells >= 10 and not is_mid:
+                # these 10 cells will get cleared when the circuit closes
+                return
+
+            # set hard upper bound on cell list size to avoid crazy memory usage
+            if num_cells >= 20000: # 20k cells, roughly 10 MiB
+                # these cells will used in classification when the circuits ends
+                return
+
+        # here we are either one of the first 10 cells on a circuit
+        # or we are a mid circuit cell under the cell limit
+
+        # Now get the remaining fields we need
         timestamp = get_float_value("EventTimestamp",
                                 fields, event_desc,
                                 is_mandatory=False)
@@ -1895,15 +1922,13 @@ class Aggregator(ReconnectingClientFactory):
 
         # we want to store the list of cells for each circuit
         # we will process them when the circuit ends
-        self.classify_info.setdefault(chan_id, {}).setdefault(circ_id, [])
+        stored_cells = self.classify_info.setdefault(chan_id, {}).setdefault(circ_id, [])
 
-        # set hard upper bound on cell list size to avoid crazy memory usage
-        if len(self.classify_info[chan_id][circ_id]) < 200000: # 200k cells, roughly 100 MiB
-            cell_to_store = Cell(chan_id, circ_id, timestamp,
-                cell_command, relay_command, is_sent, is_outbound)
-            self.classify_info[chan_id][circ_id].append(cell_to_store)
+        cell_to_store = Cell(chan_id, circ_id, timestamp,
+                            cell_command, relay_command, is_sent, is_outbound)
+        stored_cells.append(cell_to_store)
 
-        # TODO we should clear the list of cells after some timeout even if we
+        # TODO we should clear the stored_cells after some timeout even if we
         # didn't see the circuit end for some reason, in order to avoid
         # consuming too much memory. This could be done with a twisted timer.
         return

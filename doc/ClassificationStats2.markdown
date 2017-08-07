@@ -22,11 +22,12 @@ These predictions can be cross-checked by counting the following:
 
 ```
 # measured
-TODO:?: Rend2MultiHopClientCircuitCount / MidCircuitCount
 TODO:?: Rend2CircuitCount / EntryCircuitCount
 TODO:?: Rend2CircuitCount / EndCircuitCount
 TODO:?: Rend2ClientCircuitCount / ExitAndRend2ClientCircuitCount
 TODO:?: Rend2ServiceCircuitCount / ExitAndRend2ServiceCircuitCount
+TODO:?: Rend2MultiHopClientCircuitCount / (MidCircuitCount / 2)
+TODO:?: Rend2MultiHopServiceCircuitCount / (MidCircuitCount / 2)
 ```
 
 ## Liklihood of serving in CGM position
