@@ -277,8 +277,8 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
                                      self.config['rotate_period'],
                                      self.config['use_setconf'],
                                      config.get('circuit_sample_rate', 1.0),
-                                     config.get('circuit_length_limit', 4000),
-                                     config.get('circuit_time_limit', 900),
+                                     config.get('cell_length_limit', 4000),
+                                     config.get('cell_time_limit', 900),
                                      self.ml_dc_id, self.ml_req_q, self.ml_res_q)
         defer_time = config['defer_time'] if 'defer_time' in config else 0.0
         logging.info("got start command from tally server, starting aggregator in {}".format(format_delay_time_wait(defer_time, 'at')))
