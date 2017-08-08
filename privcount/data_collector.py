@@ -11,6 +11,7 @@ import yaml
 from time import time
 from copy import deepcopy
 from base64 import b64decode
+from heapq import heappush, heappop
 
 from Queue import Empty
 
@@ -276,6 +277,8 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
                                      self.config['rotate_period'],
                                      self.config['use_setconf'],
                                      config.get('circuit_sample_rate', 1.0),
+                                     config.get('circuit_length_limit', 4000),
+                                     config.get('circuit_time_limit', 900),
                                      self.ml_dc_id, self.ml_req_q, self.ml_res_q)
         defer_time = config['defer_time'] if 'defer_time' in config else 0.0
         logging.info("got start command from tally server, starting aggregator in {}".format(format_delay_time_wait(defer_time, 'at')))
@@ -430,6 +433,7 @@ class Aggregator(ReconnectingClientFactory):
     def __init__(self, counters, traffic_model_config, sk_uids,
                  noise_weight, modulus, tor_control_port, rotate_period,
                  use_setconf, circuit_sample_rate,
+                 cell_length_limit, cell_time_limit,
                  ml_dc_id, ml_req_q, ml_res_q):
         self.secure_counters = SecureCounters(counters, modulus,
                                               require_generate_noise=True)
@@ -444,6 +448,7 @@ class Aggregator(ReconnectingClientFactory):
             self.traffic_model = TrafficModel(traffic_model_config)
 
         self.classify_info = {}
+        self.classify_time = []
         self.wants_predictions = self.are_classify_counters_configured()
         self.ml_dc_id = ml_dc_id
         self.ml_req_q = ml_req_q
@@ -452,6 +457,8 @@ class Aggregator(ReconnectingClientFactory):
         self.noise_weight_config = noise_weight
         self.noise_weight_value = None
         self.circuit_sample_rate = float(circuit_sample_rate)
+        self.cell_length_limit = int(cell_length_limit)
+        self.cell_time_limit = int(cell_time_limit)
 
         self.connector = None
         self.connector_list = None
@@ -1892,7 +1899,7 @@ class Aggregator(ReconnectingClientFactory):
             # set hard upper bound on cell list size to avoid crazy memory usage
             # all facebook samples we collected had less than 1646 cells
             # use 4k cells, roughly 1 MiB (a forwarded cell counts as 2 cells)
-            if num_cells >= 4000:
+            if num_cells >= self.cell_length_limit:
                 # these cells will used in classification when the circuits ends
                 return
 
@@ -1931,13 +1938,17 @@ class Aggregator(ReconnectingClientFactory):
         # we will process them when the circuit ends
         stored_cells = self.classify_info.setdefault(chan_id, {}).setdefault(circ_id, [])
 
+        if len(stored_cells) == 0:
+            # keep track of time of first cell so we can evict the circuit
+            # after it has been around for too long
+            entry = (timestamp, chan_id, circ_id)
+            # store this in a min-heap, we will check eviction on circuit close
+            heappush(self.classify_time, entry)
+
         cell_to_store = Cell(chan_id, circ_id, timestamp,
                             cell_command, relay_command, is_sent, is_outbound)
         stored_cells.append(cell_to_store)
 
-        # TODO we should clear the stored_cells after some timeout even if we
-        # didn't see the circuit end for some reason, in order to avoid
-        # consuming too much memory. This could be done with a twisted timer.
         return
 
     @staticmethod
@@ -2399,6 +2410,22 @@ class Aggregator(ReconnectingClientFactory):
 
             # we are done with the circuit, make sure classify state is cleared
             self._try_to_clear_classify_info(fields, event_desc)
+
+            # try to clean up stale circuits that hung around b/c we lost ids
+            cleanup_count = 0
+            while len(self.classify_time) > 0:
+                entry = self.classify_time[0]
+                timestamp, chan_id, circ_id = entry
+                # if cells are limit seconds old, clear them
+                if time() - timestamp > self.cell_time_limit:
+                    heappop(self.classify_time)
+                    self._clear_classify_info(chan_id, circ_id)
+                    cleanup_count += 1
+                    continue
+                else:
+                    break
+            if cleanup_count > 0:
+                logging.info("cleared {} stale cell lists".format(cleanup_count))
 
         # we processed and handled the event
         return True

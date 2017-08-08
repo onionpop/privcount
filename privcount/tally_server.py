@@ -193,6 +193,16 @@ class TallyServer(ServerFactory, PrivCountServer):
             assert ts_conf['circuit_sample_rate'] >= 0.0
             assert ts_conf['circuit_sample_rate'] <= 1.0
 
+            ts_conf.setdefault('cell_length_limit', 4000)
+            ts_conf['cell_length_limit'] = \
+                int(ts_conf['cell_length_limit'])
+            assert ts_conf['cell_length_limit'] > 0
+
+            ts_conf.setdefault('cell_time_limit', 900)
+            ts_conf['cell_time_limit'] = \
+                int(ts_conf['cell_time_limit'])
+            assert ts_conf['cell_time_limit'] > 0
+
             # the counter bin file
             if 'counters' in ts_conf:
                 ts_conf['counters'] = normalise_path(ts_conf['counters'])
@@ -925,6 +935,8 @@ class TallyServer(ServerFactory, PrivCountServer):
                                                 counter_modulus(),
                                                 clock_padding,
                                                 self.config['circuit_sample_rate'],
+                                                self.config['cell_length_limit'],
+                                                self.config['cell_time_limit'],
                                                 self.config)
         self.collection_phase.start()
 
@@ -1019,7 +1031,7 @@ class CollectionPhase(object):
     def __init__(self, period, counters_config, traffic_model_config, noise_config,
                  noise_weight_config, dc_threshold_config, sk_uids,
                  sk_public_keys, dc_uids, modulus, clock_padding, circuit_sample_rate,
-                 tally_server_config):
+                 cell_length_limit, cell_time_limit, tally_server_config):
         # store configs
         self.period = period
         # the counter bins
@@ -1034,6 +1046,8 @@ class CollectionPhase(object):
         self.modulus = modulus
         self.clock_padding = clock_padding
         self.circuit_sample_rate = circuit_sample_rate
+        self.cell_length_limit = cell_length_limit
+        self.cell_time_limit = cell_time_limit
         # make a deep copy, so we can delete unnecesary keys
         self.tally_server_config = deepcopy(tally_server_config)
         self.tally_server_status = None
@@ -1231,6 +1245,8 @@ class CollectionPhase(object):
             config['defer_time'] = self.clock_padding
             config['collect_period'] = self.period
             config['circuit_sample_rate'] = self.circuit_sample_rate
+            config['cell_length_limit'] = self.cell_length_limit
+            config['cell_time_limit'] = self.cell_time_limit
             logging.info("sending start comand with {} counters ({} bins) and requesting {} shares to data collector {}"
                          .format(len(config['counters']),
                                  count_bins(config['counters']),
