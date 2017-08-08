@@ -192,8 +192,9 @@ class MLDCRunner(object):
             config = {
                 "dataset": self.webpage_model_path,
                 "classifier": "OneClassCUMUL",
-                "params": {"nu": 0.2, "kernel": "rbf", "gamma": 10}
+                "params": {"nu": 0.2, "kernel": "rbf", 'shrinking': True, 'tol': 0.001, "gamma": 10}
             }
+
             logging.info("configuring machine learning webpage model")
             self.webpage_model = Model(config)
 
