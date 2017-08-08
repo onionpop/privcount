@@ -1891,8 +1891,8 @@ class Aggregator(ReconnectingClientFactory):
 
             # set hard upper bound on cell list size to avoid crazy memory usage
             # all facebook samples we collected had less than 1646 cells
-            # use 2k cells, roughly 1 MiB
-            if num_cells >= 2000:
+            # use 4k cells, roughly 1 MiB (a forwarded cell counts as 2 cells)
+            if num_cells >= 4000:
                 # these cells will used in classification when the circuits ends
                 return
 
