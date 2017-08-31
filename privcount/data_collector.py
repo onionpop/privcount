@@ -2666,7 +2666,7 @@ class Aggregator(ReconnectingClientFactory):
 
                 # count site classification, but only for rend purpose and cgm position
                 # ignore the confidence, the classifier already used it to decide
-                prediction = self._predict([self.ml_dc_id, 'webpage', features])
+                prediction = self._predict([self.ml_dc_id, 'webpage_facebook', features])
                 is_fb_site = True if prediction is True else False
 
                 # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount

@@ -114,4 +114,4 @@ data_collector:
     # Model paths
     position_model: '../../model/position.model.pickle'
     purpose_model: '../../model/purpose.model.pickle'
-    webpage_model: '../../model/webpage.model.pickle'
+    webpage_facebook_model: '../../model/webpage_facebook.model.pickle'

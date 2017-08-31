@@ -39,11 +39,11 @@ class MLDCRunner(object):
 
         self.position_model_path = None
         self.purpose_model_path = None
-        self.webpage_model_path = None
+        self.webpage_facebook_model_path = None
 
         self.position_model = None
         self.purpose_model = None
-        self.webpage_model = None
+        self.webpage_facebook_model = None
 
         # incoming work queue for predictions we need to make
         self.inq = None
@@ -86,7 +86,7 @@ class MLDCRunner(object):
         # if we have at least one model, we will need to faciliate predictions
         if self.position_model is not None or \
             self.purpose_model is not None or \
-            self.webpage_model is not None:
+            self.webpage_facebook_model is not None:
             self.inq = Queue()
 
         # start all data collectors
@@ -154,11 +154,11 @@ class MLDCRunner(object):
                 logging.warning("'purpose_model' was given but no file exists at path {}".format(conf_path))
                 return False
 
-        if 'webpage_model' in candidate_config:
-            conf_path = candidate_config['webpage_model']
+        if 'webpage_facebook_model' in candidate_config:
+            conf_path = candidate_config['webpage_facebook_model']
 
             if not os.path.exists(normalise_path(conf_path)):
-                logging.warning("'webpage_model' was given but no file exists at path {}".format(conf_path))
+                logging.warning("'webpage_facebook_model' was given but no file exists at path {}".format(conf_path))
                 return False
 
         # everything is OK
@@ -187,16 +187,16 @@ class MLDCRunner(object):
             logging.info("configuring machine learning purpose model")
             self.purpose_model = Model(config)
 
-        if 'webpage_model' in self.config:
-            self.webpage_model_path = normalise_path(self.config['webpage_model'])
+        if 'webpage_facebook_model' in self.config:
+            self.webpage_facebook_model_path = normalise_path(self.config['webpage_facebook_model'])
             config = {
-                "dataset": self.webpage_model_path,
+                "dataset": self.webpage_facebook_model_path,
                 "classifier": "OneClassCUMUL",
                 "params": {"nu": 0.2, "kernel": "rbf", 'shrinking': True, 'tol': 0.001, "gamma": 10}
             }
 
-            logging.info("configuring machine learning webpage model")
-            self.webpage_model = Model(config)
+            logging.info("configuring machine learning webpage_facebook model")
+            self.webpage_facebook_model = Model(config)
 
     def _train_models(self):
         logging.info("training machine learning models now")
@@ -211,10 +211,10 @@ class MLDCRunner(object):
             self.purpose_model.train()
             logging.info("finished training machine learning purpose model")
 
-        if self.webpage_model is not None:
-            logging.info("training machine learning webpage model")
-            self.webpage_model.train()
-            logging.info("finished training machine learning webpage model")
+        if self.webpage_facebook_model is not None:
+            logging.info("training machine learning webpage_facebook model")
+            self.webpage_facebook_model.train()
+            logging.info("finished training machine learning webpage_facebook model")
 
     def _start_data_collectors(self):
         logging.info("creating and starting child data collector processes now")
@@ -287,9 +287,9 @@ class MLDCRunner(object):
                 else:
                     logging.warning("dc {} requested position prediction but no position model was configured".format(dc_id))
 
-            elif command == 'webpage':
-                if self.webpage_model is not None:
-                    is_fb_site, _ = self.webpage_model.predict(features)
+            elif command == 'webpage_facebook':
+                if self.webpage_facebook_model is not None:
+                    is_fb_site, _ = self.webpage_facebook_model.predict(features)
                     result = is_fb_site
                 else:
                     logging.warning("dc {} requested webpage prediction but no webpage model was configured".format(dc_id))
