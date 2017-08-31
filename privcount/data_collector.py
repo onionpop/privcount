@@ -276,6 +276,7 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
                                      self.config['event_source'],
                                      self.config['rotate_period'],
                                      self.config['use_setconf'],
+                                     config.get('max_cell_events_per_circuit', -1),
                                      config.get('circuit_sample_rate', 1.0),
                                      config.get('cell_length_limit', 4000),
                                      config.get('cell_time_limit', 900),
@@ -432,7 +433,8 @@ class Aggregator(ReconnectingClientFactory):
 
     def __init__(self, counters, traffic_model_config, sk_uids,
                  noise_weight, modulus, tor_control_port, rotate_period,
-                 use_setconf, circuit_sample_rate,
+                 use_setconf,
+                 max_cell_events_per_circuit, circuit_sample_rate,
                  cell_length_limit, cell_time_limit,
                  ml_dc_id, ml_req_q, ml_res_q):
         self.secure_counters = SecureCounters(counters, modulus,
@@ -456,6 +458,7 @@ class Aggregator(ReconnectingClientFactory):
 
         self.noise_weight_config = noise_weight
         self.noise_weight_value = None
+        self.max_cell_events_per_circuit = int(max_cell_events_per_circuit)
         self.circuit_sample_rate = float(circuit_sample_rate)
         self.cell_length_limit = int(cell_length_limit)
         self.cell_time_limit = int(cell_time_limit)
@@ -633,6 +636,20 @@ class Aggregator(ReconnectingClientFactory):
         rely on the torrc or another PrivCount instance to set EnablePrivCount.
         '''
         return self.use_setconf
+
+    def get_max_cell_events_per_circuit(self):
+        '''
+        Returns the PrivCountMaxCellEventsPerCircuit, an integer number in
+        [-INT_MAX, INT_MAX]. Defaults to -1 (send all cell events for each circuit).
+        '''
+        # check that the value is valid
+        assert self.max_cell_events_per_circuit is not None
+        # check that we can apply non-default values
+        if (not self.get_use_setconf() and
+            self.max_cell_events_per_circuit >= 0):
+            logging.warning("PrivCountMaxCellEventsPerCircuit {} ignored because use_setconf is False."
+                            .format(self.max_cell_events_per_circuit))
+        return self.max_cell_events_per_circuit
 
     def get_circuit_sample_rate(self):
         '''

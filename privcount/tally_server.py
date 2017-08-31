@@ -203,6 +203,10 @@ class TallyServer(ServerFactory, PrivCountServer):
                 int(ts_conf['cell_time_limit'])
             assert ts_conf['cell_time_limit'] > 0
 
+            ts_conf.setdefault('max_cell_events_per_circuit', -1)
+            ts_conf['max_cell_events_per_circuit'] = \
+                int(ts_conf['max_cell_events_per_circuit'])
+
             # the counter bin file
             if 'counters' in ts_conf:
                 ts_conf['counters'] = normalise_path(ts_conf['counters'])
@@ -934,6 +938,7 @@ class TallyServer(ServerFactory, PrivCountServer):
                                                 dc_uids,
                                                 counter_modulus(),
                                                 clock_padding,
+                                                self.config['max_cell_events_per_circuit'],
                                                 self.config['circuit_sample_rate'],
                                                 self.config['cell_length_limit'],
                                                 self.config['cell_time_limit'],
@@ -1030,8 +1035,10 @@ class CollectionPhase(object):
 
     def __init__(self, period, counters_config, traffic_model_config, noise_config,
                  noise_weight_config, dc_threshold_config, sk_uids,
-                 sk_public_keys, dc_uids, modulus, clock_padding, circuit_sample_rate,
-                 cell_length_limit, cell_time_limit, tally_server_config):
+                 sk_public_keys, dc_uids, modulus, clock_padding,
+                 max_cell_events_per_circuit, circuit_sample_rate,
+                 cell_length_limit, cell_time_limit,
+                 tally_server_config):
         # store configs
         self.period = period
         # the counter bins
@@ -1045,6 +1052,7 @@ class CollectionPhase(object):
         self.dc_uids = dc_uids
         self.modulus = modulus
         self.clock_padding = clock_padding
+        self.max_cell_events_per_circuit = max_cell_events_per_circuit
         self.circuit_sample_rate = circuit_sample_rate
         self.cell_length_limit = cell_length_limit
         self.cell_time_limit = cell_time_limit
@@ -1244,6 +1252,7 @@ class CollectionPhase(object):
             config['dc_threshold'] = self.dc_threshold_config
             config['defer_time'] = self.clock_padding
             config['collect_period'] = self.period
+            config['max_cell_events_per_circuit'] = self.max_cell_events_per_circuit
             config['circuit_sample_rate'] = self.circuit_sample_rate
             config['cell_length_limit'] = self.cell_length_limit
             config['cell_time_limit'] = self.cell_time_limit
