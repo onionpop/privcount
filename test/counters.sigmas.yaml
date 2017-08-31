@@ -485,17 +485,17 @@ counters:
         sigma: 0.0
     MidGotSignalPredictPurposeCircuitCount:
         sigma: 0.0
-    MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         sigma: 0.0
-    MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         sigma: 0.0
-    MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         sigma: 0.0
-    MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         sigma: 0.0
-    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         sigma: 0.0
-    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         sigma: 0.0
     MidPredictRendPurposePredictCGMPositionCircuitCount:
         sigma: 0.0

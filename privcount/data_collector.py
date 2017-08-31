@@ -280,6 +280,8 @@ class DataCollector(ReconnectingClientFactory, PrivCountClient):
                                      config.get('circuit_sample_rate', 1.0),
                                      config.get('cell_length_limit', 4000),
                                      config.get('cell_time_limit', 900),
+                                     config.get('webpage_model_name', None),
+                                     config.get('webpage_model_onions', None),
                                      self.ml_dc_id, self.ml_req_q, self.ml_res_q)
         defer_time = config['defer_time'] if 'defer_time' in config else 0.0
         logging.info("got start command from tally server, starting aggregator in {}".format(format_delay_time_wait(defer_time, 'at')))
@@ -436,6 +438,7 @@ class Aggregator(ReconnectingClientFactory):
                  use_setconf,
                  max_cell_events_per_circuit, circuit_sample_rate,
                  cell_length_limit, cell_time_limit,
+                 webpage_model_name, webpage_model_onions,
                  ml_dc_id, ml_req_q, ml_res_q):
         self.secure_counters = SecureCounters(counters, modulus,
                                               require_generate_noise=True)
@@ -462,6 +465,8 @@ class Aggregator(ReconnectingClientFactory):
         self.circuit_sample_rate = float(circuit_sample_rate)
         self.cell_length_limit = int(cell_length_limit)
         self.cell_time_limit = int(cell_time_limit)
+        self.webpage_model_name = None if webpage_model_name is None else str(webpage_model_name)
+        self.webpage_model_onions = webpage_model_onions
 
         self.connector = None
         self.connector_list = None
@@ -2481,20 +2486,14 @@ class Aggregator(ReconnectingClientFactory):
         # at this point we have enough to classify
         circuit = Circuit(chan_id, circ_id, prev_node, next_node, cell_list=cell_list)
 
-        # ground truth info if this is a known circuit
-        got_signal = get_flag_value("ReceivedCircuitSignal",
+        # ground truth info if we know this circuit initated at a client we control
+        is_ground_truth = get_flag_value("ReceivedCircuitSignal",
             fields, event_desc, default=False)
-        signal_payload = get_string_value("MostRecentCircuitSignalPayload",
+        ground_truth_payload = get_string_value("MostRecentCircuitSignalPayload",
             fields, event_desc, default="UNKNOWN")
 
-        # This is facebook if we got a signal and the onion is facebook.
-        # We are ignoring Facebook's CDN onions, and direct access to the underlying
-        # OnionBalance addresses.
-        payload_is_facebook_onion = True if "facebookcorewwwi" in signal_payload else False
-
-        # don't count our crawler circuits that are not used to fetch the facebook onion site
-        if (not got_signal) or (got_signal and payload_is_facebook_onion):
-            self._increment_counters_classify(circuit, got_signal)
+        # count all circuits
+        self._increment_counters_classify(circuit, is_ground_truth, ground_truth_payload)
         return
 
     def _get_node_for_classify(self, fields, event_desc, prefix):
@@ -2586,18 +2585,141 @@ class Aggregator(ReconnectingClientFactory):
         prediction = result[0]
         return prediction
 
-    def _increment_counters_classify(self, circuit, got_signal):
-        # got_signal means the circuit was built by our own client and
-        # the destination was the facebook onion site
+    def _increment_counters_classify(self, circuit, is_ground_truth, ground_truth_payload):
+        # got_signal means the circuit was built by our own client
+        # is_onion_in_model means the destination was in the current webpage model
 
         # we classify rend purpose as is_rend_purp
         #             cgm position as is_cgm_pos
-        #             and facebook_site as is_fb_site
+        #             and is_webpage if the page matches our model
         # (cgm is the client-guard-middle, i.e. the 2nd relay from the client)
 
         # turn the circuit into a features object that will be passed to the classifiers
         features = Features(circuit)
 
+        if not is_ground_truth:
+            self._predict_and_increment_unknown(circuit, features)
+        else:
+            # parse the ground truth payload
+            gt = {}
+            try:
+                keyvals = ground_truth_payload.strip().split()
+                for item in keyvals:
+                    key, value = item.split('=')
+                    gt[key] = value
+            except:
+                # some parsing error, so we dont know ground truth for sure
+                return
+
+            if 'gt_purpose' not in gt or 'gt_position' not in gt or 'gt_request' not in gt:
+                # we are missing some part of ground truth
+                return
+
+            # see circuit_purpose_to_controller_string() in src/or/circuitlist.c
+            gt_rend_purp = True if '_REND' in gt['gt_purpose'] else False
+            is_client_side = True if 'HS_SERVICE_' not in gt['gt_purpose'] else False
+            gt_cgm_pos = True if is_client_side and int(gt['gt_position']) == 2 else False
+            gt_webpage = True if gt['gt_request'] in self.webpage_model_onions else False
+
+            self._predict_and_increment_ground_truth(circuit, features,
+                gt_rend_purp, gt_cgm_pos, gt_webpage)
+
+    def _predict_and_increment_ground_truth(self, circuit, features, gt_rend_purp, gt_cgm_pos, gt_webpage):
+
+        # start with purpose
+        prediction = self._predict([self.ml_dc_id, 'purpose', features])
+        is_rend_purp = True if prediction is True else False
+
+        if is_rend_purp:
+            if gt_rend_purp:
+                # true positive
+                self.secure_counters.increment(
+                                'MidTestPurposeTruePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # false positive
+                self.secure_counters.increment(
+                                'MidTestPurposeFalsePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+        else:
+            if gt_rend_purp:
+                # false negative
+                self.secure_counters.increment(
+                                'MidTestPurposeFalseNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # true negative
+                self.secure_counters.increment(
+                                'MidTestPurposeTrueNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
+        # now position
+        prediction = self._predict([self.ml_dc_id, 'position', features])
+        is_cgm_pos = True if prediction is True else False
+
+        if is_cgm_pos:
+            if gt_cgm_pos:
+                # true positive
+                self.secure_counters.increment(
+                                'MidTestPositionTruePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # false positive
+                self.secure_counters.increment(
+                                'MidTestPositionFalsePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+        else:
+            if gt_cgm_pos:
+                # false negative
+                self.secure_counters.increment(
+                                'MidTestPositionFalseNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # true negative
+                self.secure_counters.increment(
+                                'MidTestPositionTrueNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
+        # finally, webpage
+        prediction = self._predict([self.ml_dc_id, self.webpage_model_name, features])
+        is_webpage = True if prediction is True else False
+
+        if is_webpage:
+            if gt_webpage:
+                # true positive
+                self.secure_counters.increment(
+                                'MidTestWebpageTruePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # false positive
+                self.secure_counters.increment(
+                                'MidTestWebpageFalsePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+        else:
+            if gt_webpage:
+                # false negative
+                self.secure_counters.increment(
+                                'MidTestWebpageFalseNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # true negative
+                self.secure_counters.increment(
+                                'MidTestWebpageTrueNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
+    def _predict_and_increment_unknown(self, circuit, features):
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
         prediction = self._predict([self.ml_dc_id, 'purpose', features])
@@ -2609,18 +2731,6 @@ class Aggregator(ReconnectingClientFactory):
                         bin=SINGLE_BIN,
                         inc=1)
 
-        # and how many of those we did and did not get a signal on
-        if got_signal:
-            self.secure_counters.increment(
-                            'MidGotSignalPredictPurposeCircuitCount',
-                            bin=SINGLE_BIN,
-                            inc=1)
-        else:
-            self.secure_counters.increment(
-                            'MidNoSignalPredictPurposeCircuitCount',
-                            bin=SINGLE_BIN,
-                            inc=1)
-
         # count how many circuits we predicted were rendezvous and not
         # and for how many of the rendezvous predictions we did and did not have a signal
         if is_rend_purp:
@@ -2628,19 +2738,14 @@ class Aggregator(ReconnectingClientFactory):
                             'MidPredictRendPurposeCircuitCount',
                             bin=SINGLE_BIN,
                             inc=1)
+        else:
+            self.secure_counters.increment(
+                            'MidPredictNotRendPurposeCircuitCount',
+                            bin=SINGLE_BIN,
+                            inc=1)
 
-            if got_signal:
-                self.secure_counters.increment(
-                                'MidGotSignalPredictRendPurposeCircuitCount',
-                                bin=SINGLE_BIN,
-                                inc=1)
-            else:
-                self.secure_counters.increment(
-                                'MidNoSignalPredictRendPurposeCircuitCount',
-                                bin=SINGLE_BIN,
-                                inc=1)
-
-            # count position classification, but only for rend circuits
+        # count position classification, but only for rend circuits
+        if is_rend_purp:
             # ignore the confidence, the classifier already used it to decide
             prediction = self._predict([self.ml_dc_id, 'position', features])
             is_cgm_pos = True if prediction is True else False
@@ -2652,90 +2757,29 @@ class Aggregator(ReconnectingClientFactory):
                                   'MidPredictRendPurposePredictCGMPositionCircuitCount',
                                   bin=SINGLE_BIN,
                                   inc=1)
-
-                if got_signal:
-                    self.secure_counters.increment(
-                                      'MidGotSignalPredictRendPurposePredictCGMPositionCircuitCount',
-                                      bin=SINGLE_BIN,
-                                      inc=1)
-                else:
-                    self.secure_counters.increment(
-                                      'MidNoSignalPredictRendPurposePredictCGMPositionCircuitCount',
-                                      bin=SINGLE_BIN,
-                                      inc=1)
-
-                # count site classification, but only for rend purpose and cgm position
-                # ignore the confidence, the classifier already used it to decide
-                prediction = self._predict([self.ml_dc_id, 'webpage_facebook', features])
-                is_fb_site = True if prediction is True else False
-
-                # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount
-
-                if is_fb_site:
-                    self.secure_counters.increment(
-                                'MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
-                                bin=SINGLE_BIN,
-                                inc=1)
-
-                    if got_signal:
-                        self.secure_counters.increment(
-                                    'MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
-                                    bin=SINGLE_BIN,
-                                    inc=1)
-                    else:
-                        self.secure_counters.increment(
-                                    'MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount',
-                                    bin=SINGLE_BIN,
-                                    inc=1)
-
-                else: # not is_fb_site
-                    self.secure_counters.increment(
-                                'MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
-                                bin=SINGLE_BIN,
-                                inc=1)
-
-                    if got_signal:
-                        self.secure_counters.increment(
-                                    'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
-                                    bin=SINGLE_BIN,
-                                    inc=1)
-                    else:
-                        self.secure_counters.increment(
-                                    'MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount',
-                                    bin=SINGLE_BIN,
-                                    inc=1)
-
-            else: # not is_cgm_pos
+            else:
                 self.secure_counters.increment(
                                   'MidPredictRendPurposePredictNotCGMPositionCircuitCount',
                                   bin=SINGLE_BIN,
                                   inc=1)
 
-                if got_signal:
-                    self.secure_counters.increment(
-                                      'MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount',
-                                      bin=SINGLE_BIN,
-                                      inc=1)
-                else:
-                    self.secure_counters.increment(
-                                      'MidNoSignalPredictRendPurposePredictNotCGMPositionCircuitCount',
-                                      bin=SINGLE_BIN,
-                                      inc=1)
+            # count site classification, but only for rend purpose and cgm position
+            if is_cgm_pos:
+                # ignore the confidence, the classifier already used it to decide
+                prediction = self._predict([self.ml_dc_id, self.webpage_model_name, features])
+                is_webpage = True if prediction is True else False
 
-        else: # not is_rend_purpose
-            self.secure_counters.increment(
-                            'MidPredictNotRendPurposeCircuitCount',
-                            bin=SINGLE_BIN,
-                            inc=1)
+                # number of site predictions is same as MidPredictRendPurposePredictCGMPositionCircuitCount
 
-            if got_signal:
-                self.secure_counters.increment(
-                                'MidGotSignalPredictNotRendPurposeCircuitCount',
+                if is_webpage:
+                    self.secure_counters.increment(
+                                'MidPredictRendPurposePredictCGMPositionPredictSiteCircuitCount',
                                 bin=SINGLE_BIN,
                                 inc=1)
-            else:
-                self.secure_counters.increment(
-                                'MidNoSignalPredictNotRendPurposeCircuitCount',
+
+                else: # not is_webpage
+                    self.secure_counters.increment(
+                                'MidPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount',
                                 bin=SINGLE_BIN,
                                 inc=1)
 

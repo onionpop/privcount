@@ -698,22 +698,22 @@ counters:
     MidGotSignalPredictPurposeCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
-    MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
-    MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
-    MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
-    MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
-    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
-    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         estimated_value: 0.0
         sensitivity: 0.0
     MidPredictRendPurposePredictCGMPositionCircuitCount:

@@ -49,10 +49,10 @@ Rendezvous, CGM:
 
 Rendezvous, CGM, Facebook:
 
-`MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount`: total number of predicted rendezvous, predicted CGM circuits that we predict are Facebook circuits
-`MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount`: of above, originated at our crawler
-`MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount`: of above, did not originate at our crawler
+`MidPredictRendPurposePredictCGMPositionPredictSiteCircuitCount`: total number of predicted rendezvous, predicted CGM circuits that we predict are Facebook circuits
+`MidGotSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount`: of above, originated at our crawler
+`MidNoSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount`: of above, did not originate at our crawler
 
-`MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount`: total number of predicted rendezvous, predicted CGM circuits that we predict are NOT Facebook circuits
-`MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount`: of above, originated at our crawler
-`MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount`: of above, did not originate at our crawler
+`MidPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount`: total number of predicted rendezvous, predicted CGM circuits that we predict are NOT Facebook circuits
+`MidGotSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount`: of above, originated at our crawler
+`MidNoSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount`: of above, did not originate at our crawler

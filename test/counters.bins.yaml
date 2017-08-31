@@ -2102,22 +2102,22 @@ counters:
     MidGotSignalPredictPurposeCircuitCount:
         bins:
         - [-.inf, .inf]
-    MidPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         bins:
         - [-.inf, .inf]
-    MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         bins:
         - [-.inf, .inf]
-    MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount:
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount:
         bins:
         - [-.inf, .inf]
-    MidPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         bins:
         - [-.inf, .inf]
-    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidNoSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         bins:
         - [-.inf, .inf]
-    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount:
+    MidGotSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount:
         bins:
         - [-.inf, .inf]
     MidPredictRendPurposePredictCGMPositionCircuitCount:

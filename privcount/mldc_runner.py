@@ -40,10 +40,14 @@ class MLDCRunner(object):
         self.position_model_path = None
         self.purpose_model_path = None
         self.webpage_facebook_model_path = None
+        self.webpage_duckduckgo_model_path = None
+        self.webpage_markets_model_path = None
 
         self.position_model = None
         self.purpose_model = None
         self.webpage_facebook_model = None
+        self.webpage_duckduckgo_model = None
+        self.webpage_markets_model = None
 
         # incoming work queue for predictions we need to make
         self.inq = None
@@ -86,7 +90,9 @@ class MLDCRunner(object):
         # if we have at least one model, we will need to faciliate predictions
         if self.position_model is not None or \
             self.purpose_model is not None or \
-            self.webpage_facebook_model is not None:
+            self.webpage_facebook_model is not None or \
+            self.webpage_duckduckgo_model is not None or \
+            self.webpage_markets_model is not None:
             self.inq = Queue()
 
         # start all data collectors
@@ -140,26 +146,16 @@ class MLDCRunner(object):
 
         # specifying the machine learning models is optional
         # but if the paths are specified, then files should exist
-        if 'position_model' in candidate_config:
-            conf_path = candidate_config['position_model']
+        supported_models = ['position_model', 'purpose_model',
+            'webpage_facebook_model', 'webpage_duckduckgo_model', 'webpage_markets_model']
 
-            if not os.path.exists(normalise_path(conf_path)):
-                logging.warning("'position_model' was given but no file exists at path {}".format(conf_path))
-                return False
+        for model_name in supported_models:
+            if model_name in candidate_config:
+                conf_path = candidate_config[model_name]
 
-        if 'purpose_model' in candidate_config:
-            conf_path = candidate_config['purpose_model']
-
-            if not os.path.exists(normalise_path(conf_path)):
-                logging.warning("'purpose_model' was given but no file exists at path {}".format(conf_path))
-                return False
-
-        if 'webpage_facebook_model' in candidate_config:
-            conf_path = candidate_config['webpage_facebook_model']
-
-            if not os.path.exists(normalise_path(conf_path)):
-                logging.warning("'webpage_facebook_model' was given but no file exists at path {}".format(conf_path))
-                return False
+                if not os.path.exists(normalise_path(conf_path)):
+                    logging.warning("'{}' was given but no file exists at path {}".format(model_name, conf_path))
+                    return False
 
         # everything is OK
         return True
@@ -198,6 +194,28 @@ class MLDCRunner(object):
             logging.info("configuring machine learning webpage_facebook model")
             self.webpage_facebook_model = Model(config)
 
+        if 'webpage_duckduckgo_model' in self.config:
+            self.webpage_duckduckgo_model_path = normalise_path(self.config['webpage_duckduckgo_model'])
+            config = {
+                "dataset": self.webpage_duckduckgo_model_path,
+                "classifier": "OneClassCUMUL",
+                "params": {"nu": 0.2, "kernel": "rbf", 'shrinking': True, 'tol': 0.001, "gamma": 10}
+            }
+
+            logging.info("configuring machine learning webpage_duckduckgo model")
+            self.webpage_duckduckgo_model = Model(config)
+
+        if 'webpage_markets_model' in self.config:
+            self.webpage_markets_model_path = normalise_path(self.config['webpage_markets_model'])
+            config = {
+                "dataset": self.webpage_markets_model_path,
+                "classifier": "OneClassCUMUL",
+                "params": {"nu": 0.2, "kernel": "rbf", 'shrinking': True, 'tol': 0.001, "gamma": 10}
+            }
+
+            logging.info("configuring machine learning webpage_markets model")
+            self.webpage_markets_model = Model(config)
+
     def _train_models(self):
         logging.info("training machine learning models now")
 
@@ -215,6 +233,16 @@ class MLDCRunner(object):
             logging.info("training machine learning webpage_facebook model")
             self.webpage_facebook_model.train()
             logging.info("finished training machine learning webpage_facebook model")
+
+        if self.webpage_duckduckgo_model is not None:
+            logging.info("training machine learning webpage_duckduckgo model")
+            self.webpage_duckduckgo_model.train()
+            logging.info("finished training machine learning webpage_duckduckgo model")
+
+        if self.webpage_markets_model is not None:
+            logging.info("training machine learning webpage_markets model")
+            self.webpage_markets_model.train()
+            logging.info("finished training machine learning webpage_markets model")
 
     def _start_data_collectors(self):
         logging.info("creating and starting child data collector processes now")
@@ -292,7 +320,21 @@ class MLDCRunner(object):
                     is_fb_site, _ = self.webpage_facebook_model.predict(features)
                     result = is_fb_site
                 else:
-                    logging.warning("dc {} requested webpage prediction but no webpage model was configured".format(dc_id))
+                    logging.warning("dc {} requested webpage_facebook prediction but no webpage_facebook model was configured".format(dc_id))
+
+            elif command == 'webpage_duckduckgo':
+                if self.webpage_duckduckgo_model is not None:
+                    is_ddg_site, _ = self.webpage_duckduckgo_model.predict(features)
+                    result = is_ddg_site
+                else:
+                    logging.warning("dc {} requested webpage_duckduckgo prediction but no webpage_duckduckgo model was configured".format(dc_id))
+
+            elif command == 'webpage_markets':
+                if self.webpage_markets_model is not None:
+                    is_market_site, _ = self.webpage_markets_model.predict(features)
+                    result = is_market_site
+                else:
+                    logging.warning("dc {} requested webpage_markets prediction but no webpage_markets model was configured".format(dc_id))
 
             else:
                 logging.warning("got unrecognized command '{}' from dc {}".format(command, dc_id))

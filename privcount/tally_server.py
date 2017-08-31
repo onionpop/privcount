@@ -207,6 +207,15 @@ class TallyServer(ServerFactory, PrivCountServer):
             ts_conf['max_cell_events_per_circuit'] = \
                 int(ts_conf['max_cell_events_per_circuit'])
 
+            if 'webpage_model_name' in ts_conf:
+                ts_conf['webpage_model_name'] = str(ts_conf['webpage_model_name'])
+                assert 'webpage_model_onions' in ts_conf
+                ts_conf['webpage_model_onions'] = str(ts_conf['webpage_model_onions'])
+            else:
+                ts_conf['webpage_model_name'] = None
+                ts_conf['webpage_model_onions'] = None
+
+
             # the counter bin file
             if 'counters' in ts_conf:
                 ts_conf['counters'] = normalise_path(ts_conf['counters'])
@@ -942,6 +951,8 @@ class TallyServer(ServerFactory, PrivCountServer):
                                                 self.config['circuit_sample_rate'],
                                                 self.config['cell_length_limit'],
                                                 self.config['cell_time_limit'],
+                                                self.config['webpage_model_name'],
+                                                self.config['webpage_model_onions'],
                                                 self.config)
         self.collection_phase.start()
 
@@ -1038,6 +1049,7 @@ class CollectionPhase(object):
                  sk_public_keys, dc_uids, modulus, clock_padding,
                  max_cell_events_per_circuit, circuit_sample_rate,
                  cell_length_limit, cell_time_limit,
+                 webpage_model_name, webpage_model_onions,
                  tally_server_config):
         # store configs
         self.period = period
@@ -1056,6 +1068,8 @@ class CollectionPhase(object):
         self.circuit_sample_rate = circuit_sample_rate
         self.cell_length_limit = cell_length_limit
         self.cell_time_limit = cell_time_limit
+        self.webpage_model_name = webpage_model_name
+        self.webpage_model_onions = webpage_model_onions
         # make a deep copy, so we can delete unnecesary keys
         self.tally_server_config = deepcopy(tally_server_config)
         self.tally_server_status = None
@@ -1256,6 +1270,9 @@ class CollectionPhase(object):
             config['circuit_sample_rate'] = self.circuit_sample_rate
             config['cell_length_limit'] = self.cell_length_limit
             config['cell_time_limit'] = self.cell_time_limit
+            if self.webpage_model_name != None:
+                config['webpage_model_name'] = self.webpage_model_name
+                config['webpage_model_onions'] = self.webpage_model_onions
             logging.info("sending start comand with {} counters ({} bins) and requesting {} shares to data collector {}"
                          .format(len(config['counters']),
                                  count_bins(config['counters']),

@@ -100,11 +100,11 @@ onionpop_parameters = {
     'MidGotSignalPredictRendPurposePredictNotCGMPositionCircuitCount': circuit_crawler_parameters,
 
     # facebook webpage
-    'MidNoSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': circuit_fb_parameters,
-    'MidNoSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': circuit_rend_c_parameters, # could optimize?
+    'MidNoSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount': circuit_fb_parameters,
+    'MidNoSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount': circuit_rend_c_parameters, # could optimize?
 
-    'MidGotSignalPredictRendPurposePredictCGMPositionPredictFBSiteCircuitCount': circuit_crawler_parameters,
-    'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotFBSiteCircuitCount': circuit_crawler_parameters,
+    'MidGotSignalPredictRendPurposePredictCGMPositionPredictSiteCircuitCount': circuit_crawler_parameters,
+    'MidGotSignalPredictRendPurposePredictCGMPositionPredictNotSiteCircuitCount': circuit_crawler_parameters,
 }
 
 if __name__ == '__main__':

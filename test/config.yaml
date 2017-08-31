@@ -112,6 +112,8 @@ data_collector:
     # all nodes must agree on this key to handshake correctly
     secret_handshake: 'keys/secret_handshake.yaml'
     # Model paths
-    position_model: '../../model/position.model.pickle'
-    purpose_model: '../../model/purpose.model.pickle'
-    webpage_facebook_model: '../../model/webpage_facebook.model.pickle'
+    position_model: '../../model/position.model.libsvm'
+    purpose_model: '../../model/purpose.model.libsvm'
+    webpage_facebook_model: '../../model/webpage_facebook.model.libsvm'
+    webpage_duckduckgo_model: '../../model/webpage_duckduckgo.model.libsvm'
+    webpage_markets_model: '../../model/webpage_markets.model.libsvm'
