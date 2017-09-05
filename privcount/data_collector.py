@@ -2609,10 +2609,12 @@ class Aggregator(ReconnectingClientFactory):
                     gt[key] = value
             except:
                 # some parsing error, so we dont know ground truth for sure
+                logging.warning("Error parsing ground truth payload, ignoring circuit (payload was '{}', gt was '{}')".format(ground_truth_payload, gt))
                 return
 
             if 'gt_purpose' not in gt or 'gt_position' not in gt or 'gt_request' not in gt:
                 # we are missing some part of ground truth
+                logging.warning("Missing parts of ground truth, ignoring circuit (payload was '{}', gt was '{}')".format(ground_truth_payload, gt))
                 return
 
             # see circuit_purpose_to_controller_string() in src/or/circuitlist.c
