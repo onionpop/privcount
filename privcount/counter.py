@@ -563,6 +563,11 @@ PRIVCOUNT_COUNTER_EVENTS = {
 'MidTestWebpageFalseNegativeCount' : { CIRCUIT_EVENT, CELL_EVENT },
 'MidTestWebpageTrueNegativeCount' : { CIRCUIT_EVENT, CELL_EVENT },
 
+'MidTestPipelineTruePositiveCount' : { CIRCUIT_EVENT, CELL_EVENT },
+'MidTestPipelineFalsePositiveCount' : { CIRCUIT_EVENT, CELL_EVENT },
+'MidTestPipelineFalseNegativeCount' : { CIRCUIT_EVENT, CELL_EVENT },
+'MidTestPipelineTrueNegativeCount' : { CIRCUIT_EVENT, CELL_EVENT },
+
 'MidPredictPurposeCircuitCount' : { CIRCUIT_EVENT, CELL_EVENT },
 'MidPredictRendPurposeCircuitCount' : { CIRCUIT_EVENT, CELL_EVENT },
 'MidPredictNotRendPurposeCircuitCount' : { CIRCUIT_EVENT, CELL_EVENT },
@@ -588,6 +593,10 @@ def get_classify_counter_labels():
         'MidTestWebpageFalsePositiveCount',
         'MidTestWebpageFalseNegativeCount',
         'MidTestWebpageTrueNegativeCount',
+        'MidTestPipelineTruePositiveCount',
+        'MidTestPipelineFalsePositiveCount',
+        'MidTestPipelineFalseNegativeCount',
+        'MidTestPipelineTrueNegativeCount',
         'MidPredictPurposeCircuitCount',
         'MidPredictRendPurposeCircuitCount',
         'MidPredictNotRendPurposeCircuitCount',

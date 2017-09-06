@@ -2721,6 +2721,37 @@ class Aggregator(ReconnectingClientFactory):
                                 bin=SINGLE_BIN,
                                 inc=1)
 
+        # now count the full end-to-end 'pipeline'
+        pipeline_predict = True if is_rend_purp and is_cgm_pos and is_webpage else False
+        pipeline_gt = True if gt_rend_purp and gt_cgm_pos and gt_webpage else False
+
+        if pipeline_predict:
+            if pipeline_gt:
+                # true positive
+                self.secure_counters.increment(
+                                'MidTestPipelineTruePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # false positive
+                self.secure_counters.increment(
+                                'MidTestPipelineFalsePositiveCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+        else:
+            if pipeline_gt:
+                # false negative
+                self.secure_counters.increment(
+                                'MidTestPipelineFalseNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+            else:
+                # true negative
+                self.secure_counters.increment(
+                                'MidTestPipelineTrueNegativeCount',
+                                bin=SINGLE_BIN,
+                                inc=1)
+
     def _predict_and_increment_unknown(self, circuit, features):
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
