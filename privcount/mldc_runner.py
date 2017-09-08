@@ -61,16 +61,16 @@ class MLDCRunner(object):
         self.num_tasks_processed = 0
 
     def run(self):
-    	try:
-    	    self._run()
-    	except KeyboardInterrupt:
-    	    # ctrl-c
-    	    logging.info("attempting to shut down gracefully")
+        try:
+            self._run()
+        except KeyboardInterrupt:
+            # ctrl-c
+            logging.info("attempting to shut down gracefully")
             for dc_id in self.dcpmap:
                 proc = self.dcpnap[dc_id]
                 if proc is not None:
                     proc.terminate()
-    	    self._cleanup()
+            self._cleanup()
 
     def _run(self):
         config = None
@@ -342,7 +342,7 @@ class MLDCRunner(object):
             # every request should have a response
             outq.put([result])
 
-	    self.num_tasks_processed += 1
+            self.num_tasks_processed += 1
 
     def _should_stop(self):
         '''return true if we should stop processing events, cleanup, and exit'''
