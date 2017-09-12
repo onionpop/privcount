@@ -2603,9 +2603,9 @@ class Aggregator(ReconnectingClientFactory):
             # parse the ground truth payload
             gt = {}
             try:
-                keyvals = ground_truth_payload.strip().split()
+                keyvals = ground_truth_payload.strip().split(';')
                 for item in keyvals:
-                    key, value = item.split('=')
+                    key, value = item.split(':')
                     gt[key] = value
             except:
                 # some parsing error, so we dont know ground truth for sure
