@@ -1954,6 +1954,10 @@ class Aggregator(ReconnectingClientFactory):
                                  is_mandatory=False,
                                  default="UNKNOWN")
 
+        # dont count cells that were used to send us ground truth
+        if relay_command == "SIGNAL":
+            return
+
         # if we get here, we have all of the fields we need for the cell
 
         # we want to store the list of cells for each circuit
