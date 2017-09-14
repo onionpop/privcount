@@ -2429,8 +2429,7 @@ class Aggregator(ReconnectingClientFactory):
                 # these flags should never be true for mid circuits
                 assert not is_origin
                 assert not is_entry
-                assert not is_exit
-                assert not is_end
+                assert not is_end # end includes dir, hsdir, rend pt, intro pt, and exit
                 # run classifiers and increment counters
                 self._handle_circuit_classify(fields, event_desc)
 
