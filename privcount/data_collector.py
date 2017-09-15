@@ -2601,7 +2601,7 @@ class Aggregator(ReconnectingClientFactory):
         features = Features(circuit)
 
         if not is_ground_truth:
-            self._predict_and_increment_unknown(circuit, features)
+            self._predict_and_increment_unknown(features)
         else:
             # parse the ground truth payload
             gt = {}
@@ -2626,10 +2626,10 @@ class Aggregator(ReconnectingClientFactory):
             gt_cgm_pos = True if is_client_side and int(gt['gt_position']) == 2 else False
             gt_webpage = True if gt['gt_request'] in self.webpage_model_onions else False
 
-            self._predict_and_increment_ground_truth(circuit, features,
+            self._predict_and_increment_ground_truth(features,
                 gt_rend_purp, gt_cgm_pos, gt_webpage)
 
-    def _predict_and_increment_ground_truth(self, circuit, features, gt_rend_purp, gt_cgm_pos, gt_webpage):
+    def _predict_and_increment_ground_truth(self, features, gt_rend_purp, gt_cgm_pos, gt_webpage):
 
         # start with purpose
         prediction = self._predict([self.ml_dc_id, 'purpose', features])
@@ -2755,7 +2755,7 @@ class Aggregator(ReconnectingClientFactory):
                                 bin=SINGLE_BIN,
                                 inc=1)
 
-    def _predict_and_increment_unknown(self, circuit, features):
+    def _predict_and_increment_unknown(self, features):
         # now actually run the classifiers and increment counters
         # ignore the confidence values, the classifier already used them to classify
         prediction = self._predict([self.ml_dc_id, 'purpose', features])
