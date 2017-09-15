@@ -217,7 +217,7 @@ class MLDCRunner(object):
             self.webpage_markets_model = Model(config)
 
     def _train_models(self):
-        logging.info("training machine learning models now")
+        logging.info("starting to train machine learning models now")
 
         if self.position_model is not None:
             logging.info("training machine learning position model")
@@ -243,6 +243,8 @@ class MLDCRunner(object):
             logging.info("training machine learning webpage_markets model")
             self.webpage_markets_model.train()
             logging.info("finished training machine learning webpage_markets model")
+
+        logging.info("finished training machine learning models")
 
     def _start_data_collectors(self):
         logging.info("creating and starting child data collector processes now")
