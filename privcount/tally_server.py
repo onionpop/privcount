@@ -210,7 +210,7 @@ class TallyServer(ServerFactory, PrivCountServer):
             if 'webpage_model_name' in ts_conf:
                 ts_conf['webpage_model_name'] = str(ts_conf['webpage_model_name'])
                 assert 'webpage_model_onions' in ts_conf
-                ts_conf['webpage_model_onions'] = str(ts_conf['webpage_model_onions'])
+                ts_conf['webpage_model_onions'] = ts_conf['webpage_model_onions']
             else:
                 ts_conf['webpage_model_name'] = None
                 ts_conf['webpage_model_onions'] = None
